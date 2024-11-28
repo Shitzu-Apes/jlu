@@ -1,8 +1,13 @@
 {
 	"name": "jlu-ui",
+	"private": true,
+	"workspaces": [
+		"api"
+	],
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
+		"api": "yarn workspace jlu-api",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
@@ -15,7 +20,8 @@
 		"@unocss/reset": "^0.64.1"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^3.0.0",
+		"@cloudflare/workers-types": "^4.20241112.0",
+		"@sveltejs/adapter-cloudflare": "^4.7.4",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@typescript-eslint/eslint-plugin": "^8.16.0",
@@ -34,9 +40,10 @@
 		"prettier-plugin-svelte": "^3.2.6",
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
-		"typescript": "^5.0.0",
+		"typescript": "5.7.2",
 		"typescript-eslint": "^8.0.0",
 		"unocss": "^0.64.1",
-		"vite": "^5.0.3"
+		"vite": "^5.0.3",
+		"wrangler": "^3.91.0"
 	}
 }
