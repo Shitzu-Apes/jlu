@@ -5,7 +5,7 @@
 	import type { Auth } from '$lib/auth';
 	import '@unocss/reset/tailwind.css';
 	import 'virtual:uno.css';
-	// import "../../app.scss";
+	import '../app.css';
 
 	onMount(() => {
 		setTimeout(() => {

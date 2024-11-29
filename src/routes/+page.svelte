@@ -1,8 +1,10 @@
 <script>
-	import XOauthButton from '$lib/components/XOauthButton.svelte';
+	import Conversation from '$lib/components/Conversation.svelte';
 </script>
 
-<h1 class="font-bold font-500">Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<div class="flex flex-col w-vw h-vh gap-4 items-center bg-purple-9 text-white py-5">
+	<h1 class="font-bold text-8">Meet Juicy Lucy</h1>
+	<p>Juicy Lucy is your interactive AI flirting partner</p>
 
-<XOauthButton />
+	<Conversation />
+</div>

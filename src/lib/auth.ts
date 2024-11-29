@@ -1,3 +1,5 @@
+import { writable } from 'svelte/store';
+
 export type Auth = {
 	expires_at: number;
 	token: {
@@ -13,3 +15,5 @@ export type Auth = {
 		username: string;
 	};
 };
+
+export const session$ = writable<Auth | undefined>();
