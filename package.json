@@ -17,10 +17,13 @@
 		"format": "prettier --write ."
 	},
 	"dependencies": {
-		"@unocss/reset": "^0.64.1"
+		"@unocss/reset": "^0.64.1",
+		"ts-pattern": "^5.5.0"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20241112.0",
+		"@iconify-json/mdi": "^1.2.1",
+		"@iconify-json/ri": "^1.2.3",
 		"@sveltejs/adapter-cloudflare": "^4.7.4",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",

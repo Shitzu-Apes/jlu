@@ -16,4 +16,4 @@ export type Auth = {
 	};
 };
 
-export const session$ = writable<Auth | undefined>();
+export const session$ = writable<Promise<Auth | undefined>>(new Promise<never>(() => undefined));

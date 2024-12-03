@@ -11,10 +11,9 @@
 
 <button
 	on:click={handleSignIn}
-	class="flex items-center gap-2 px-4 py-2 bg-[#1DA1F2] hover:bg-[#1a8cd8] text-white rounded-lg font-medium transition-colors"
+	class="flex items-center gap-2 px-4 py-2 bg-black hover:bg-#222 text-white rounded-lg font-medium transition-colors"
 >
-	<div class="i-mdi:check-decagram text-lg"></div>
-	<span>Login</span>
-	<div class="i-mdi:twitter text-lg"></div>
+	<span>Login with</span>
+	<div class="i-ri:twitter-x-line text-lg"></div>
 	<span class="sr-only">with X (Twitter)</span>
 </button>

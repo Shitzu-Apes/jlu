@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 
 	import { pushState } from '$app/navigation';
-	import type { Auth } from '$lib/auth';
+	import { session$, type Auth } from '$lib/auth';
 	import '@unocss/reset/tailwind.css';
 	import 'virtual:uno.css';
 	import '../app.css';
@@ -32,6 +32,7 @@
 				.then((auth) => {
 					if (!auth.token || !auth.user) return;
 					localStorage.setItem('auth', JSON.stringify(auth));
+					$session$ = Promise.resolve(auth);
 				});
 		});
 	});
@@ -53,6 +54,7 @@
 			.then((auth) => {
 				if (!auth.token || !auth.user) return;
 				localStorage.setItem('auth', JSON.stringify(auth));
+				$session$ = Promise.resolve(auth);
 			});
 	});
 </script>
