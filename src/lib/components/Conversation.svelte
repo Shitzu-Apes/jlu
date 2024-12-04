@@ -2,11 +2,13 @@
 	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';
 
+	import ClaimPoints from './ClaimPoints.svelte';
 	import type { LucyMood } from './Mood.svelte';
 	import Mood from './Mood.svelte';
 	import XOauthButton from './XOauthButton.svelte';
 
 	import { session$ } from '$lib/auth';
+	import { openBottomSheet } from '$lib/layout/BottomSheet';
 
 	$: isLoggedIn = $session$.then((session) => session != null);
 	const focusedMessage$ = writable<Message | undefined>();
@@ -96,6 +98,17 @@
 		// Use setTimeout to ensure the DOM has updated
 		setTimeout(scrollToBottom, 0);
 	}
+
+	$: lastMessage = conversation[conversation.length - 1];
+	$: hasEnded = lastMessage?.points != null && lastMessage?.evaluation != null;
+
+	function handleOpenClaimPoints() {
+		if (!hasEnded || !lastMessage.points || !lastMessage.evaluation) return;
+		openBottomSheet(ClaimPoints, {
+			points: lastMessage.points,
+			evaluation: lastMessage.evaluation
+		});
+	}
 </script>
 
 <div class="flex md:flex-row flex-col h-full w-full max-w-5xl">
@@ -176,19 +189,28 @@
 		<!-- Fixed input area -->
 		<div class="border-t border-purple-800/50 p-4 flex-shrink-0">
 			<div class="max-w-3xl mx-auto">
-				<div class="flex gap-2">
-					<input
-						type="text"
-						class="flex-1 bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400"
-						placeholder="Send a message..."
-					/>
+				{#if hasEnded}
 					<button
-						class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors"
-						aria-label="Send"
+						on:click={handleOpenClaimPoints}
+						class="w-full bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors font-medium"
 					>
-						<div class="i-mdi:send text-2xl" />
+						Claim {lastMessage.points} Points
 					</button>
-				</div>
+				{:else}
+					<div class="flex gap-2">
+						<input
+							type="text"
+							class="flex-1 bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400"
+							placeholder="Send a message..."
+						/>
+						<button
+							class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors"
+							aria-label="Send"
+						>
+							<div class="i-mdi:send text-2xl" />
+						</button>
+					</div>
+				{/if}
 			</div>
 		</div>
 
