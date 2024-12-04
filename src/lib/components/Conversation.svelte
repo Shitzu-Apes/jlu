@@ -16,38 +16,64 @@
 		message: string;
 		mood?: LucyMood;
 		points?: number;
+		evaluation?: string;
 	};
 
 	const conversation: Message[] = [
 		{
 			sender: 'user',
-			message: 'Hey babe, got some of them juice for me?'
+			message: "Hey, are you new here? Haven't seen you around"
 		},
 		{
 			sender: 'lucy',
 			message:
-				"Well, aren't you bold? I might have some juice, but only for those who earn it. What makes you think you're worthy of a taste?",
-			mood: 'flirty'
-		},
-		{
-			sender: 'user',
-			message: 'idk, want to watch a movie together at my home?'
-		},
-		{
-			sender: 'lucy',
-			message:
-				"Hmm, inviting me to your place already? That's quite the shortcut. What kind of movie are we talking about, Mr. Smooth-Talker? Better not be something boring.",
+				'Well, you’ve found me now. But tell me, do I look like the kind of girl who just blends into the background?',
 			mood: 'playful'
 		},
 		{
 			sender: 'user',
-			message: "idk, let's see when we are there"
+			message:
+				'haha no definitely not *shy smile*\nYou look like you have a charismatic personality'
 		},
 		{
 			sender: 'lucy',
 			message:
-				"Oh, so you're a 'go with the flow' type? Tempting... but I hope your flow's not all talk and no charm.",
-			mood: 'sassy'
+				'Charismatic, huh? Flattery will get you places—maybe even a peek behind the ribbon. What about you? Do you always lead with that shy smile, or is it just for me?',
+			mood: 'flirty'
+		},
+		{
+			sender: 'user',
+			message: '*ehm* looks like you got me there.\nAnyway, what have you been up to?'
+		},
+		{
+			sender: 'lucy',
+			message:
+				'Oh, just floating through conversations, leaving a trail of sparkles and smiles. You know, the usual. But now I’m curious—what’s your secret to catching a girl’s attention like this?',
+			mood: 'curious'
+		},
+		{
+			sender: 'user',
+			message:
+				"I usually don't catch a girl's attention like you said, but you seemed approachable. Thanks for that"
+		},
+		{
+			sender: 'lucy',
+			message:
+				'Approachable? Now that’s a compliment I’ll gladly take. But careful, you might just inspire me to keep being this charming. So, are you always this sweet, or am I just lucky today?',
+			mood: 'dreamy'
+		},
+		{
+			sender: 'user',
+			message: 'I guess we both might have been lucky. Want to catch a drink together?'
+		},
+		{
+			sender: 'lucy',
+			message:
+				'Tempting offer. You might just be my kind of lucky charm tonight. Let’s see if your company is as good as your compliments!',
+			mood: 'flirty',
+			points: 85,
+			evaluation:
+				'You were sincere, sweet, and kept the conversation light without being pushy. Your compliments felt genuine, and you built a nice rapport. Bonus points for the smooth transition to a casual invite, but you could add a bit more wit or playful boldness to really sweep me off my feet.'
 		}
 	];
 
