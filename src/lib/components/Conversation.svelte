@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';
 
 	import type { LucyMood } from './Mood.svelte';
@@ -49,6 +50,26 @@
 			mood: 'sassy'
 		}
 	];
+
+	let conversationContainer: HTMLDivElement;
+
+	function scrollToBottom() {
+		if (conversationContainer) {
+			conversationContainer.scrollTo({
+				top: conversationContainer.scrollHeight,
+				behavior: 'smooth'
+			});
+		}
+	}
+
+	onMount(() => {
+		scrollToBottom();
+	});
+
+	$: if (conversation) {
+		// Use setTimeout to ensure the DOM has updated
+		setTimeout(scrollToBottom, 0);
+	}
 </script>
 
 <div class="flex md:flex-row flex-col h-full w-full max-w-5xl">
@@ -71,7 +92,7 @@
 		</div>
 
 		<!-- Scrollable conversation area -->
-		<div class="flex-1 overflow-y-auto min-h-0">
+		<div bind:this={conversationContainer} class="flex-1 overflow-y-auto min-h-0">
 			<div class="max-w-3xl mx-auto py-4 px-4 flex flex-col gap-6">
 				{#each conversation as message}
 					<div
@@ -94,12 +115,14 @@
 									<Mood
 										mood={message.mood ?? 'happy'}
 										size="sm"
-										className="size-10 rounded-full bg-zinc-900/50"
+										className="size-10 rounded-full bg-purple-900/50"
 									/>
 								</div>
 							{:else}
 								<div class="group-hover/message:scale-105 transition-transform duration-200">
-									<div class="size-10 rounded-full bg-zinc-800/30 flex items-center justify-center">
+									<div
+										class="size-10 rounded-full bg-purple-800/30 flex items-center justify-center"
+									>
 										<div class="i-mdi:account text-2xl" />
 									</div>
 								</div>
@@ -108,13 +131,13 @@
 						<div
 							class="flex flex-col gap-1 max-w-[80%] {message.sender === 'user' ? 'items-end' : ''}"
 						>
-							<span class="text-sm text-purple-200/70">
+							<span class="text-sm text-purple-200">
 								{message.sender === 'lucy' ? 'Lucy J.' : 'You'}
 							</span>
 							<div
 								class="rounded-2xl px-4 py-2 {message.sender === 'user'
-									? 'bg-zinc-800/50 text-white'
-									: 'bg-zinc-800/30 text-white'} transition-colors duration-200 group-hover/message:bg-purple-900/20"
+									? 'bg-purple-800/30 text-white'
+									: 'bg-purple-900/30 text-white'} transition-colors duration-200 group-hover/message:bg-purple-800/50"
 							>
 								{message.message}
 							</div>
@@ -125,7 +148,7 @@
 		</div>
 
 		<!-- Fixed input area -->
-		<div class="border-t border-purple-900/20 p-4 bg-zinc-950 flex-shrink-0">
+		<div class="border-t border-purple-800/50 p-4 flex-shrink-0">
 			<div class="max-w-3xl mx-auto">
 				<div class="flex gap-2">
 					<input
@@ -145,11 +168,9 @@
 
 		{#if !isLoggedIn}
 			<div
-				class="absolute inset-0 flex items-center justify-center bg-zinc-950/50 backdrop-blur-sm"
+				class="absolute inset-0 flex items-center justify-center bg-purple-950/30 backdrop-blur-sm"
 			>
-				<div
-					class="bg-zinc-900/90 p-6 rounded-xl text-center max-w-md mx-4 border border-purple-900/20"
-				>
+				<div class="bg-purple-900/90 p-6 rounded-xl text-center max-w-md mx-4">
 					<p class="text-purple-100 font-bold mb-4">You need to be logged in to chat with Lucy</p>
 					<XOauthButton />
 				</div>
