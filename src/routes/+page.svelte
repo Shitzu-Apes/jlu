@@ -1,11 +1,24 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+
+	import { browser } from '$app/environment';
 	import Conversation from '$lib/components/Conversation.svelte';
+	import Disclaimer from '$lib/components/Disclaimer.svelte';
 	import HowItWorks from '$lib/components/HowItWorks.svelte';
 	import { openBottomSheet } from '$lib/layout/BottomSheet';
 
 	function handleOpenHowItWorks() {
 		openBottomSheet(HowItWorks);
 	}
+
+	onMount(() => {
+		if (browser) {
+			const hasAcceptedDisclaimer = localStorage.getItem('disclaimer_accepted') === 'true';
+			if (!hasAcceptedDisclaimer) {
+				openBottomSheet(Disclaimer, {}, 'l', { closeOnClickOutside: false });
+			}
+		}
+	});
 </script>
 
 <div class="flex flex-col w-full h-screen overflow-hidden bg-zinc-950 text-white">

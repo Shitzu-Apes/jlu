@@ -10,6 +10,9 @@
 	const component = writable<{
 		component: AnyComponent;
 		props: Record<string, unknown>;
+		options?: {
+			closeOnClickOutside?: boolean;
+		};
 	} | null>(null);
 	const size$: Writable<'m' | 'l'> = writable('m');
 
@@ -18,10 +21,13 @@
 	export function openBottomSheet(
 		newComponent: AnyComponent,
 		props: Record<string, unknown> = {},
-		size?: 'm' | 'l'
+		size?: 'm' | 'l',
+		options?: {
+			closeOnClickOutside?: boolean;
+		}
 	) {
 		open.set(true);
-		component.set({ component: newComponent, props });
+		component.set({ component: newComponent, props, options });
 		size$.set(size ?? 'm');
 		if (browser) {
 			document.body.style.overflow = 'hidden';
@@ -51,12 +57,18 @@
 			document.body.style.overflow = '';
 		}
 	});
+
+	function handleClickOutside() {
+		if ($component?.options?.closeOnClickOutside !== false) {
+			closeBottomSheet();
+		}
+	}
 </script>
 
 {#if $open && mounted}
 	<button
 		class="fixed inset-0 bg-black/80 z-30 cursor-auto"
-		on:click={closeBottomSheet}
+		on:click={handleClickOutside}
 		aria-label="Close"
 	/>
 {/if}
@@ -70,13 +82,15 @@
 			: 'translate-y-full opacity-0'} transition ease-out duration-200 rounded-t-xl border-3 border-b-0 bg-zinc-900 lg:rounded-xl lg:border-3"
 	>
 		<div class="h-full">
-			<button
-				class="absolute top-3 right-3 rounded-full flex justify-center items-center px-1 py-1 text-zinc-400 hover:text-zinc-200 transition-colors"
-				aria-label="Close"
-				on:click={closeBottomSheet}
-			>
-				<div class="block i-mdi:close size-6 ml-auto" />
-			</button>
+			{#if $component?.options?.closeOnClickOutside !== false}
+				<button
+					class="absolute top-3 right-3 rounded-full flex justify-center items-center px-1 py-1 text-zinc-400 hover:text-zinc-200 transition-colors"
+					aria-label="Close"
+					on:click={closeBottomSheet}
+				>
+					<div class="block i-mdi:close size-6 ml-auto" />
+				</button>
+			{/if}
 			{#if $component}
 				<svelte:component this={$component.component} {...$component.props} />
 			{/if}
