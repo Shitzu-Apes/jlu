@@ -3,6 +3,8 @@
 
 	import { pushState } from '$app/navigation';
 	import { session$, type Auth } from '$lib/auth';
+	import { BottomSheet } from '$lib/layout/BottomSheet';
+
 	import '@unocss/reset/tailwind.css';
 	import 'virtual:uno.css';
 	import '../app.css';
@@ -63,3 +65,5 @@
 </script>
 
 <slot />
+
+<BottomSheet />
