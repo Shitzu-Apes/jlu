@@ -11,9 +11,8 @@
 
 <button
 	on:click={handleSignIn}
-	class="flex items-center gap-2 px-4 py-2 bg-black hover:bg-#222 text-white rounded-lg font-medium transition-colors"
+	class="flex items-center gap-2 px-6 py-2.5 bg-zinc-800/50 hover:bg-purple-900/20 text-white rounded-xl font-medium transition-colors border border-purple-900/20"
 >
-	<span>Login with</span>
-	<div class="i-ri:twitter-x-line text-lg"></div>
-	<span class="sr-only">with X (Twitter)</span>
+	<div class="i-ri:twitter-x-line text-lg" />
+	<span>Continue with X</span>
 </button>

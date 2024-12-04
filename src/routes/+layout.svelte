@@ -39,7 +39,10 @@
 
 	onMount(() => {
 		const authString = localStorage.getItem('auth');
-		if (!authString) return;
+		if (!authString) {
+			$session$ = Promise.resolve(undefined);
+			return;
+		}
 		const auth: Auth = JSON.parse(authString);
 
 		fetch(

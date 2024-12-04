@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { writable } from 'svelte/store';
 
-	import Mood, { type LucyMood } from './Mood.svelte';
+	import type { LucyMood } from './Mood.svelte';
+	import Mood from './Mood.svelte';
 	import XOauthButton from './XOauthButton.svelte';
 
 	import { session$ } from '$lib/auth';
 
-	$: isLoggedIn = $session$ != null;
-	console.log('[isLoggedIn]', isLoggedIn);
-
-	let focusedMessage$ = writable<Message | undefined>(undefined);
+	$: isLoggedIn = $session$.then((session) => session != null);
+	const focusedMessage$ = writable<Message | undefined>();
 
 	type Message = {
 		sender: 'user' | 'lucy';
@@ -26,7 +25,7 @@
 		{
 			sender: 'lucy',
 			message:
-				'Well, aren’t you bold? I might have some juice, but only for those who earn it. What makes you think you’re worthy of a taste?',
+				"Well, aren't you bold? I might have some juice, but only for those who earn it. What makes you think you're worthy of a taste?",
 			mood: 'flirty'
 		},
 		{
@@ -36,7 +35,7 @@
 		{
 			sender: 'lucy',
 			message:
-				'Hmm, inviting me to your place already? That’s quite the shortcut. What kind of movie are we talking about, Mr. Smooth-Talker? Better not be something boring.',
+				"Hmm, inviting me to your place already? That's quite the shortcut. What kind of movie are we talking about, Mr. Smooth-Talker? Better not be something boring.",
 			mood: 'playful'
 		},
 		{
@@ -46,82 +45,114 @@
 		{
 			sender: 'lucy',
 			message:
-				'Oh, so you’re a ‘go with the flow’ type? Tempting... but I hope your flow’s not all talk and no charm.',
+				"Oh, so you're a 'go with the flow' type? Tempting... but I hope your flow's not all talk and no charm.",
 			mood: 'sassy'
 		}
 	];
 </script>
 
-<div
-	class="flex md:flex-row flex-col flex-1 h-0 gap-4 p-2 w-full sm:max-w-md md:max-w-2xl lg:max-w-3xl xl:max-w-4xl rounded-md"
->
-	<div class="flex justify-center flex-col items-center mb-4">
+<div class="flex md:flex-row flex-col h-full w-full max-w-5xl">
+	<div class="md:flex hidden flex-col items-center md:w-64 py-4 px-2 flex-shrink-0">
 		<Mood
 			mood={$focusedMessage$?.mood ?? conversation[conversation.length - 1]?.mood ?? 'happy'}
 			size="md"
-			className="md:w-48 md:h-80 w-24 h-40"
+			className="md:w-48 md:h-80 w-32 h-52"
 		/>
-		<h1 class="font-bold text-l">Lucy J.</h1>
 	</div>
 
-	<div class="flex flex-col flex-1 h-0 md:h-full content relative">
-		<div class="flex flex-col flex-1 gap-6 overflow-y-auto pb-4">
-			{#each conversation as message}
-				<div
-					class="flex flex-col gap-2 px-2 {message.sender === 'user'
-						? 'items-end'
-						: 'items-start'} {$focusedMessage$ === message ? 'bg-purple-900/40' : ''}"
-					role="listitem"
-					on:mouseenter={() => {
-						if (message.sender === 'lucy') {
-							$focusedMessage$ = message;
-						}
-					}}
-					on:mouseleave={() => {
-						if (message.sender === 'lucy') {
-							$focusedMessage$ = undefined;
-						}
-					}}
-				>
-					<span class="text-sm text-gray-200 flex items-center gap-2">
-						{#if message.sender === 'lucy'}
-							<Mood mood={message.mood ?? 'happy'} size="sm" className="size-12" />
-							Lucy J.
-						{:else}
-							You
-						{/if}
-					</span>
-					<span
-						class="text-base bg-gray-500/20 rounded-md p-2 {message.sender === 'user'
-							? 'ml-4'
-							: 'mr-4'}">{message.message}</span
-					>
-				</div>
-			{/each}
-		</div>
-		<div class="flex items-center gap-2">
-			<input
-				type="text"
-				class="flex-1 text-black border border-gray-300 rounded-full px-4 py-2 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500"
-				placeholder="Chat with Lucy..."
-				disabled={!isLoggedIn}
+	<div class="flex flex-col flex-1 min-h-0 relative">
+		<!-- Mobile mood display -->
+		<div class="md:hidden flex flex-col items-center py-4 flex-shrink-0">
+			<Mood
+				mood={$focusedMessage$?.mood ?? conversation[conversation.length - 1]?.mood ?? 'happy'}
+				size="md"
+				className="w-32 h-52"
 			/>
-			<button
-				class="bg-purple-500 text-white rounded-full px-4 py-2 focus:outline-none hover:bg-purple-600"
-				disabled={!isLoggedIn}
-				aria-label="Send"
-				><div class="i-mdi:send size-6"></div>
-			</button>
+		</div>
+
+		<!-- Scrollable conversation area -->
+		<div class="flex-1 overflow-y-auto min-h-0">
+			<div class="max-w-3xl mx-auto py-4 px-4 flex flex-col gap-6">
+				{#each conversation as message}
+					<div
+						class="flex gap-4 {message.sender === 'user' ? 'flex-row-reverse' : ''} group/message"
+						role="listitem"
+						on:mouseenter={() => {
+							if (message.sender === 'lucy') {
+								focusedMessage$.set(message);
+							}
+						}}
+						on:mouseleave={() => {
+							if (message.sender === 'lucy') {
+								focusedMessage$.set(undefined);
+							}
+						}}
+					>
+						<div class="flex-shrink-0">
+							{#if message.sender === 'lucy'}
+								<div class="group-hover/message:scale-105 transition-transform duration-200">
+									<Mood
+										mood={message.mood ?? 'happy'}
+										size="sm"
+										className="size-10 rounded-full bg-zinc-900/50"
+									/>
+								</div>
+							{:else}
+								<div class="group-hover/message:scale-105 transition-transform duration-200">
+									<div class="size-10 rounded-full bg-zinc-800/30 flex items-center justify-center">
+										<div class="i-mdi:account text-2xl" />
+									</div>
+								</div>
+							{/if}
+						</div>
+						<div
+							class="flex flex-col gap-1 max-w-[80%] {message.sender === 'user' ? 'items-end' : ''}"
+						>
+							<span class="text-sm text-purple-200/70">
+								{message.sender === 'lucy' ? 'Lucy J.' : 'You'}
+							</span>
+							<div
+								class="rounded-2xl px-4 py-2 {message.sender === 'user'
+									? 'bg-zinc-800/50 text-white'
+									: 'bg-zinc-800/30 text-white'} transition-colors duration-200 group-hover/message:bg-purple-900/20"
+							>
+								{message.message}
+							</div>
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+
+		<!-- Fixed input area -->
+		<div class="border-t border-purple-900/20 p-4 bg-zinc-950 flex-shrink-0">
+			<div class="max-w-3xl mx-auto">
+				<div class="flex gap-2">
+					<input
+						type="text"
+						class="flex-1 bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400"
+						placeholder="Send a message..."
+					/>
+					<button
+						class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors"
+						aria-label="Send"
+					>
+						<div class="i-mdi:send text-2xl" />
+					</button>
+				</div>
+			</div>
 		</div>
 
 		{#if !isLoggedIn}
 			<div
-				class="absolute inset-0 flex items-center justify-center bg-purple-900/30 backdrop-blur-sm flex flex-col gap-4"
+				class="absolute inset-0 flex items-center justify-center bg-zinc-950/50 backdrop-blur-sm"
 			>
-				<span class="text-purple-100 font-bold text-center p-4 rounded bg-purple-900/90 mx-4">
-					You are not logged in. In order to chat with Juicy Lucy, you need to be logged in.
-				</span>
-				<XOauthButton />
+				<div
+					class="bg-zinc-900/90 p-6 rounded-xl text-center max-w-md mx-4 border border-purple-900/20"
+				>
+					<p class="text-purple-100 font-bold mb-4">You need to be logged in to chat with Lucy</p>
+					<XOauthButton />
+				</div>
 			</div>
 		{/if}
 	</div>

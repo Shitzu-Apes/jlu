@@ -22,6 +22,7 @@
 	import { fade } from 'svelte/transition';
 	import { match } from 'ts-pattern';
 
+	import { browser } from '$app/environment';
 	import Angry from '$lib/assets/angry.webp';
 	import AngrySquare from '$lib/assets/angry_square.webp';
 	import Annoyed from '$lib/assets/annoyed.webp';
@@ -57,56 +58,85 @@
 
 	export let mood: LucyMood;
 	export let size: 'sm' | 'md' = 'md';
-
 	export let className: string;
 
 	let moodImage: string = '';
+	let isLoading = true;
+
+	function loadImage(src: string): Promise<string> {
+		if (!browser) {
+			return Promise.resolve(src);
+		}
+		return new Promise((resolve) => {
+			const img = new Image();
+			img.onload = () => resolve(src);
+			img.src = src;
+		});
+	}
+
 	$: if (mood || size) {
+		isLoading = true;
 		moodImage = '';
-		setTimeout(() => {
-			moodImage = match([mood, size])
-				.with(['angry', 'sm'], () => AngrySquare)
-				.with(['angry', 'md'], () => Angry)
-				.with(['annoyed', 'sm'], () => AnnoyedSquare)
-				.with(['annoyed', 'md'], () => Annoyed)
-				.with(['confident', 'sm'], () => ConfidentSquare)
-				.with(['confident', 'md'], () => Confident)
-				.with(['confused', 'sm'], () => ConfusedSquare)
-				.with(['confused', 'md'], () => Confused)
-				.with(['curious', 'sm'], () => CuriousSquare)
-				.with(['curious', 'md'], () => Curious)
-				.with(['dreamy', 'sm'], () => DreamySquare)
-				.with(['dreamy', 'md'], () => Dreamy)
-				.with(['embarrassed', 'sm'], () => EmbarrassedSquare)
-				.with(['embarrassed', 'md'], () => Embarrassed)
-				.with(['excited', 'sm'], () => ExcitedSquare)
-				.with(['excited', 'md'], () => Excited)
-				.with(['flirty', 'sm'], () => FlirtySquare)
-				.with(['flirty', 'md'], () => Flirty)
-				.with(['happy', 'sm'], () => HappySquare)
-				.with(['happy', 'md'], () => Happy)
-				.with(['playful', 'sm'], () => PlayfulSquare)
-				.with(['playful', 'md'], () => Playful)
-				.with(['pouty', 'sm'], () => PoutySquare)
-				.with(['pouty', 'md'], () => Pouty)
-				.with(['sad', 'sm'], () => SadSquare)
-				.with(['sad', 'md'], () => Sad)
-				.with(['sassy', 'sm'], () => SassySquare)
-				.with(['sassy', 'md'], () => Sassy)
-				.with(['shy', 'sm'], () => ShySquare)
-				.with(['shy', 'md'], () => Shy)
-				.with(['surprised', 'sm'], () => SurprisedSquare)
-				.with(['surprised', 'md'], () => Surprised)
-				.exhaustive();
-		}, 150);
+		const newImage = match([mood, size])
+			.with(['angry', 'sm'], () => AngrySquare)
+			.with(['angry', 'md'], () => Angry)
+			.with(['annoyed', 'sm'], () => AnnoyedSquare)
+			.with(['annoyed', 'md'], () => Annoyed)
+			.with(['confident', 'sm'], () => ConfidentSquare)
+			.with(['confident', 'md'], () => Confident)
+			.with(['confused', 'sm'], () => ConfusedSquare)
+			.with(['confused', 'md'], () => Confused)
+			.with(['curious', 'sm'], () => CuriousSquare)
+			.with(['curious', 'md'], () => Curious)
+			.with(['dreamy', 'sm'], () => DreamySquare)
+			.with(['dreamy', 'md'], () => Dreamy)
+			.with(['embarrassed', 'sm'], () => EmbarrassedSquare)
+			.with(['embarrassed', 'md'], () => Embarrassed)
+			.with(['excited', 'sm'], () => ExcitedSquare)
+			.with(['excited', 'md'], () => Excited)
+			.with(['flirty', 'sm'], () => FlirtySquare)
+			.with(['flirty', 'md'], () => Flirty)
+			.with(['happy', 'sm'], () => HappySquare)
+			.with(['happy', 'md'], () => Happy)
+			.with(['playful', 'sm'], () => PlayfulSquare)
+			.with(['playful', 'md'], () => Playful)
+			.with(['pouty', 'sm'], () => PoutySquare)
+			.with(['pouty', 'md'], () => Pouty)
+			.with(['sad', 'sm'], () => SadSquare)
+			.with(['sad', 'md'], () => Sad)
+			.with(['sassy', 'sm'], () => SassySquare)
+			.with(['sassy', 'md'], () => Sassy)
+			.with(['shy', 'sm'], () => ShySquare)
+			.with(['shy', 'md'], () => Shy)
+			.with(['surprised', 'sm'], () => SurprisedSquare)
+			.with(['surprised', 'md'], () => Surprised)
+			.exhaustive();
+
+		loadImage(newImage).then((loadedImage) => {
+			setTimeout(() => {
+				moodImage = loadedImage;
+				isLoading = false;
+			}, 150);
+		});
 	}
 </script>
 
-{#if moodImage}
-	<img
-		transition:fade={{ duration: 200 }}
-		src={moodImage}
-		alt="Lucy"
-		class="rounded-full mx-auto {className}"
-	/>
-{/if}
+<div class="relative {className} group">
+	{#if isLoading}
+		<div
+			class="absolute inset-0 bg-purple-800/30 animate-pulse rounded-full"
+			transition:fade={{ duration: 200 }}
+		/>
+	{/if}
+	{#if moodImage}
+		<div
+			class="absolute inset-0 rounded-full ring-2 ring-purple-500/0 group-hover:ring-purple-500/50 transition-all duration-200 group-hover:ring-offset-2 ring-offset-purple-950 group-hover:scale-105"
+		/>
+		<img
+			transition:fade={{ duration: 200 }}
+			src={moodImage}
+			alt="Lucy"
+			class="rounded-full w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+		/>
+	{/if}
+</div>
