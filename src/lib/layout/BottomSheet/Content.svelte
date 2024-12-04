@@ -1,16 +1,8 @@
-<div class="flex flex-col w-full h-full mx-auto justify-start items-center">
-	<div class="h-15 w-full flex flex-col">
-		<!-- heder slot -->
-
-		<div class="flex-1 flex items-center">
-			<slot name="header" />
-		</div>
-		<!-- Horizontal Line -->
-		<hr class="w-full" />
-	</div>
-	<div
-		class="block w-full h-[calc(100%-3.75rem)] overflow-y-auto overscroll-contain noscrollbar pb-10"
-	>
+<div class="h-full flex flex-col">
+	<header class="flex-shrink-0 min-h-[4rem] flex items-center border-b border-purple-900/20">
+		<slot name="header" />
+	</header>
+	<div class="flex-1 overflow-y-auto">
 		<slot />
 	</div>
 </div>

@@ -16,7 +16,7 @@
 </script>
 
 <Content>
-	<div slot="header" class="w-full px-6 py-4">
+	<div slot="header" class="w-full h-full flex items-center px-6">
 		<h2 class="text-2xl font-bold text-purple-100">Claim Your Points</h2>
 	</div>
 
@@ -27,6 +27,28 @@
 			</div>
 			<p class="text-lg text-purple-200/70">Lucy's Evaluation</p>
 			<p class="mt-2 text-lg italic">"{evaluation}"</p>
+		</section>
+
+		<section class="bg-purple-900/20 rounded-xl p-4 text-sm">
+			<div class="flex items-start gap-3">
+				<div class="i-mdi:information text-xl text-purple-200/70 mt-0.5" />
+				<div>
+					<div class="font-medium text-purple-100">Public Posting Notice</div>
+					<div class="mt-1 text-purple-200/70">
+						By claiming your points, your conversation with Lucy will be posted on <span
+							class="inline-flex items-baseline"
+							><div class="i-ri:twitter-x-line translate-y-[0.1em]" /></span
+						>
+						through our official account
+						<a
+							href="https://x.com/SimpsForLucy"
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-300 hover:text-purple-200 transition-colors">@SimpsForLucy</a
+						>. This post will also be retweeted from your account to showcase your achievement.
+					</div>
+				</div>
+			</div>
 		</section>
 
 		<section class="space-y-4">
@@ -54,11 +76,11 @@
 			</button>
 		</section>
 
-		<section class="text-sm text-purple-200/70">
-			<p>
+		<section class="text-sm space-y-2 text-purple-200/70">
+			<div>
 				Your points will be sent to your NEAR wallet as tokens. Make sure to provide a valid wallet
 				address.
-			</p>
+			</div>
 		</section>
 	</div>
 </Content>
