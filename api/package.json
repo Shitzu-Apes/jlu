@@ -9,6 +9,7 @@
 		"cf-typegen": "wrangler types"
 	},
 	"dependencies": {
-		"hono": "^4.6.12"
+		"hono": "^4.6.12",
+		"openai": "^4.75.0"
 	}
 }

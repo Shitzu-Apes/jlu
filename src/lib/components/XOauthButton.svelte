@@ -13,6 +13,7 @@
 	on:click={handleSignIn}
 	class="flex items-center gap-2 px-6 py-2.5 bg-zinc-800/50 hover:bg-purple-900/20 text-white rounded-xl font-medium transition-colors border border-purple-900/20"
 >
-	<div class="i-ri:twitter-x-line text-lg" />
-	<span>Continue with X</span>
+	<span
+		>Login with <div class="i-ri:twitter-x-line inline-block translate-y-[0.1em]" /></span
+	>
 </button>

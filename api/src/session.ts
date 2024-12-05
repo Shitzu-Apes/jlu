@@ -32,6 +32,7 @@ export class Session extends DurableObject {
 				console.log('[auth]', this.auth);
 
 				await this.storage.put('auth', this.auth);
+				return c.text('', { status: 204 });
 			});
 	}
 

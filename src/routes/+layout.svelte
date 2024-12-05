@@ -1,9 +1,18 @@
 <script lang="ts">
+	import dayjs from 'dayjs';
+	import duration from 'dayjs/plugin/duration';
+	import relativeTime from 'dayjs/plugin/relativeTime';
 	import { onMount } from 'svelte';
 
-	import { pushState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { session$, type Auth } from '$lib/auth';
+	import Toast, { showToast } from '$lib/components/Toast.svelte';
 	import { BottomSheet } from '$lib/layout/BottomSheet';
+
+	// eslint-disable-next-line import/no-named-as-default-member
+	dayjs.extend(relativeTime);
+	// eslint-disable-next-line import/no-named-as-default-member
+	dayjs.extend(duration);
 
 	import '@unocss/reset/tailwind.css';
 	import 'virtual:uno.css';
@@ -18,23 +27,35 @@
 			const nonce = sessionStorage.getItem('nonce');
 			if (!state || !code || !nonce) return;
 			if (state !== nonce) return;
+
+			// Clean up URL params
 			url.searchParams.delete('state');
 			url.searchParams.delete('code');
-			pushState(url.href, {});
+			goto(url.href, { replaceState: true, noScroll: true });
 
 			fetch(
 				`${import.meta.env.VITE_API_URL}/auth/login?code=${code}&nonce=${nonce}&redirect_url=${window.location.origin}`
 			)
 				.then(async (res) => {
 					if (!res.ok) {
-						console.error('auth failed', res.status, await res.text());
+						const error = await res.text();
+						console.error('auth failed', res.status, error);
+						showToast('Login failed. Please try again later.');
+						return;
 					}
 					return res.json<Auth>();
 				})
 				.then((auth) => {
-					if (!auth.token || !auth.user) return;
+					if (!auth) return;
+					if (!auth.token || !auth.user) {
+						showToast('Login failed. Please try again later.');
+						return;
+					}
 					localStorage.setItem('auth', JSON.stringify(auth));
 					$session$ = Promise.resolve(auth);
+				})
+				.catch((err) => {
+					console.error('Login error:', err);
 				});
 		});
 	});
@@ -47,23 +68,20 @@
 		}
 		const auth: Auth = JSON.parse(authString);
 
-		fetch(
-			`${import.meta.env.VITE_API_URL}/auth/login/refresh?refresh_token=${auth.token.refresh_token}&user_id=${auth.user.id}`
-		)
-			.then(async (res) => {
-				if (!res.ok) {
-					console.error('auth failed', res.status, await res.text());
-				}
-				return res.json<Auth>();
-			})
-			.then((auth) => {
-				if (!auth.token || !auth.user) return;
-				localStorage.setItem('auth', JSON.stringify(auth));
-				$session$ = Promise.resolve(auth);
-			});
+		// Check if token has expired
+		const now = Date.now();
+		if (auth.expires_at < now) {
+			localStorage.removeItem('auth');
+			$session$ = Promise.resolve(undefined);
+			return;
+		}
+
+		$session$ = Promise.resolve(auth);
 	});
 </script>
 
 <slot />
+
+<Toast />
 
 <BottomSheet />

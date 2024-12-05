@@ -4,6 +4,7 @@ import { poweredBy } from 'hono/powered-by';
 import type { HTTPResponseError } from 'hono/types';
 
 import { auth } from './auth';
+import { chat } from './chat';
 
 const app = new Hono();
 
@@ -17,6 +18,7 @@ app.use(
 );
 
 app.route('/auth', auth);
+app.route('/chat', chat);
 
 app.onError(async (err) => {
 	if (typeof (err as HTTPResponseError)['getResponse'] !== 'undefined') {
@@ -37,4 +39,5 @@ app.notFound(() => {
 });
 
 export default app;
+export { FlirtBattle } from './chat';
 export { Session } from './session';
