@@ -224,69 +224,59 @@ async function handleTokenResponse(c: Context<Env>, tokenResponse: Response) {
 
 	let user: { id: string; name: string; username: string };
 
-	if (c.env.DEV === '1') {
-		// Development mode - use hardcoded user
-		user = {
-			id: 'VXNlcjoxMzA4NjYxODE5NTM2NTM1NTUy',
-			username: 'marior_dev',
-			name: 'Mario Reder'
-		};
-		console.log('[user] Using hardcoded user data for development');
-	} else {
-		// Try to get user data from KV cache first
-		const kv = c.env.KV;
-		const userId = c.req.header('X-User-Id');
-		const cacheKey = userId ? `user:${userId}` : null;
-		const cachedUser = cacheKey
-			? await kv.get<{
+	// Try to get user data from KV cache first
+	const kv = c.env.KV;
+	const userId = c.req.header('X-User-Id');
+	const cacheKey = userId ? `user:${userId}` : null;
+	const cachedUser = cacheKey
+		? await kv.get<{
+				id: string;
+				name: string;
+				username: string;
+				cached_at: number;
+			}>(cacheKey, 'json')
+		: null;
+
+	// Cache miss or data older than 24 hours
+	if (!cachedUser || Date.now() - cachedUser.cached_at > 24 * 60 * 60 * 1000) {
+		console.log('[user] Cache miss, fetching from Twitter');
+		// Get user data from Twitter
+		const userResponse = await fetch('https://api.x.com/2/users/me', {
+			headers: {
+				Authorization: `Bearer ${token.access_token}`
+			}
+		});
+
+		const userError = await handleTwitterResponse(userResponse, 'user');
+		if (userError) return userError;
+
+		user = await userResponse
+			.json<{
+				data: {
 					id: string;
 					name: string;
 					username: string;
-					cached_at: number;
-				}>(cacheKey, 'json')
-			: null;
+				};
+			}>()
+			.then(({ data }) => data);
 
-		// Cache miss or data older than 24 hours
-		if (!cachedUser || Date.now() - cachedUser.cached_at > 24 * 60 * 60 * 1000) {
-			console.log('[user] Cache miss, fetching from Twitter');
-			// Get user data from Twitter
-			const userResponse = await fetch('https://api.x.com/2/users/me', {
-				headers: {
-					Authorization: `Bearer ${token.access_token}`
-				}
-			});
-
-			const userError = await handleTwitterResponse(userResponse, 'user');
-			if (userError) return userError;
-
-			user = await userResponse
-				.json<{
-					data: {
-						id: string;
-						name: string;
-						username: string;
-					};
-				}>()
-				.then(({ data }) => data);
-
-			// Cache the user data with timestamp
-			await kv.put(
-				`user:${user.id}`,
-				JSON.stringify({
-					...user,
-					cached_at: Date.now()
-				}),
-				{
-					expirationTtl: 24 * 60 * 60 // 24 hours in seconds
-				}
-			);
-			console.log('[user] User data fetched and cached:', user.id);
-		} else {
-			// Use cached data
-			const { id, name, username } = cachedUser;
-			user = { id, name, username };
-			console.log('[user] Using cached user data:', user.id);
-		}
+		// Cache the user data with timestamp
+		await kv.put(
+			`user:${user.id}`,
+			JSON.stringify({
+				...user,
+				cached_at: Date.now()
+			}),
+			{
+				expirationTtl: 24 * 60 * 60 // 24 hours in seconds
+			}
+		);
+		console.log('[user] User data fetched and cached:', user.id);
+	} else {
+		// Use cached data
+		const { id, name, username } = cachedUser;
+		user = { id, name, username };
+		console.log('[user] Using cached user data:', user.id);
 	}
 
 	const id = c.env.SESSION.idFromName(user.id);
