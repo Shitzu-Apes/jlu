@@ -277,7 +277,17 @@ async function createThread(
 	// First tweet: Score and evaluation
 	const truncatedEvaluation =
 		evaluation.length > 200 ? evaluation.slice(0, 197) + '...' : evaluation;
-	const scoreTweet = `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"`;
+	const lastLucyMessage = messages.filter((m) => m.sender === 'lucy').slice(-1)[0];
+	const scoreTweet = {
+		text: `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"\n\n@SimpsForLucy`,
+		...(lastLucyMessage?.mood && {
+			media: {
+				media_ids: [
+					`https://raw.githubusercontent.com/Shitzu-Apes/jlu/022d69d11d8719a7e24dc1ae1dd0f1b752d7cc82/src/lib/assets/${lastLucyMessage.mood}_square.webp`
+				]
+			}
+		})
+	};
 
 	const scoreResponse = await fetch('https://api.x.com/2/tweets', {
 		method: 'POST',
@@ -285,9 +295,7 @@ async function createThread(
 			Authorization: `Bearer ${token}`,
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({
-			text: scoreTweet
-		})
+		body: JSON.stringify(scoreTweet)
 	});
 
 	if (!scoreResponse.ok) {
@@ -301,12 +309,17 @@ async function createThread(
 
 	// Rest of the conversation
 	let currentTweet = '';
+	let currentImage: string | undefined;
 
 	for (const message of messages) {
-		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}\n`;
+		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}${message.sender === 'lucy' ? '\n\n@SimpsForLucy' : ''}\n`;
+		const image =
+			message.sender === 'lucy' && message.mood
+				? `https://raw.githubusercontent.com/Shitzu-Apes/jlu/022d69d11d8719a7e24dc1ae1dd0f1b752d7cc82/src/lib/assets/${message.mood}_square.webp`
+				: undefined;
 
-		// If adding this line would exceed Twitter's limit
-		if (currentTweet.length + line.length > 280) {
+		// If adding this line would exceed Twitter's limit or if we have an image and current tweet has text
+		if (currentTweet.length + line.length > 280 || (image && currentTweet)) {
 			// Post current tweet
 			const response = await fetch('https://api.x.com/2/tweets', {
 				method: 'POST',
@@ -316,6 +329,11 @@ async function createThread(
 				},
 				body: JSON.stringify({
 					text: currentTweet,
+					...(currentImage && {
+						media: {
+							media_ids: [currentImage]
+						}
+					}),
 					reply: {
 						in_reply_to_tweet_id: tweetIds[tweetIds.length - 1]
 					}
@@ -331,8 +349,10 @@ async function createThread(
 			} = await response.json<{ data: { id: string } }>();
 			tweetIds.push(id);
 			currentTweet = line;
+			currentImage = image;
 		} else {
 			currentTweet += line;
+			if (image) currentImage = image;
 		}
 	}
 
@@ -346,6 +366,11 @@ async function createThread(
 			},
 			body: JSON.stringify({
 				text: currentTweet,
+				...(currentImage && {
+					media: {
+						media_ids: [currentImage]
+					}
+				}),
 				reply: {
 					in_reply_to_tweet_id: tweetIds[tweetIds.length - 1]
 				}
