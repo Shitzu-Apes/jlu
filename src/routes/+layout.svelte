@@ -34,7 +34,9 @@
 			url.searchParams.delete('code');
 			goto(url.href, { replaceState: true, noScroll: true });
 
-			fetchApi(`/auth/login?code=${code}&nonce=${nonce}&redirect_url=${window.location.origin}`)
+			fetch(
+				`${import.meta.env.VITE_API_URL}/auth/login?code=${code}&nonce=${nonce}&redirect_url=${window.location.origin}`
+			)
 				.then(async (res) => {
 					if (!res.ok) {
 						const error = await res.text();
