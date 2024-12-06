@@ -11,6 +11,7 @@ mode = "smart"
 
 [vars]
 TWITTER_CLIENT_ID = "V1pmZnRIcTJqZnNNbFNILTNnQXI6MTpjaQ"
+TWITTER_LUCY_USER_ID = "1861724864756822016"
 
 [durable_objects]
 bindings = [

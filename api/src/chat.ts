@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { Env } from 'hono';
+import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
 import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { OpenAI } from 'openai';
@@ -246,10 +246,10 @@ async function getTweetQuotaRemaining(kv: KVNamespace): Promise<number> {
 	if (!count) {
 		// No tweets today yet
 		await kv.put(key, '0', { expirationTtl: 24 * 60 * 60 });
-		return 50; // Keep 50 tweets reserved for API usage
+		return 15;
 	}
 
-	return 50 - parseInt(count);
+	return 15 - parseInt(count);
 }
 
 async function incrementTweetCount(kv: KVNamespace): Promise<void> {
@@ -379,6 +379,53 @@ async function retweetFromUser(tweetId: string, userId: string, token: string): 
 
 	if (!response.ok) {
 		console.error('Failed to retweet:', await response.text());
+	}
+}
+
+// Constants for rate limiting
+const RETWEET_COOLDOWN_KEY = 'retweet-cooldown';
+const RETWEET_COOLDOWN_MINS = 15;
+
+// Helper functions
+async function canRetweet(kv: KVNamespace): Promise<boolean> {
+	const now = Date.now();
+	const lastRetweetStr = (await kv.get(RETWEET_COOLDOWN_KEY, { type: 'text' })) || '0';
+	const lastRetweet = parseInt(lastRetweetStr, 10);
+	return now - lastRetweet >= RETWEET_COOLDOWN_MINS * 60 * 1000;
+}
+
+async function updateRetweetCooldown(kv: KVNamespace): Promise<void> {
+	await kv.put(RETWEET_COOLDOWN_KEY, Date.now().toString(), {
+		expirationTtl: RETWEET_COOLDOWN_MINS * 60
+	});
+}
+
+async function tryRetweet(c: Context<Env>, tweetId: string): Promise<void> {
+	try {
+		if (await canRetweet(c.env.KV)) {
+			// Attempt retweet
+			const response = await fetch(
+				`https://api.twitter.com/2/users/${c.env.TWITTER_LUCY_USER_ID}/retweets/${tweetId}`,
+				{
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${c.env.TWITTER_BEARER_TOKEN}`,
+						'Content-Type': 'application/json'
+					}
+				}
+			);
+
+			if (response.ok) {
+				await updateRetweetCooldown(c.env.KV);
+				console.log('[retweet] Successfully retweeted:', tweetId);
+			} else {
+				console.warn('[retweet] Failed to retweet:', tweetId, await response.text());
+			}
+		} else {
+			console.log('[retweet] Skipping retweet due to rate limit:', tweetId);
+		}
+	} catch (error) {
+		console.error('[retweet] Error retweeting:', error);
 	}
 }
 
@@ -659,6 +706,8 @@ export const chat = new Hono<Env>()
 					session.token.access_token
 				);
 				tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
+
+				await tryRetweet(c, tweetIds[0]);
 			} else {
 				const {
 					data: { id }
@@ -671,6 +720,8 @@ export const chat = new Hono<Env>()
 			// Create thread from user's account
 			const tweetIds = await createThread(messages, points, evaluation, session.token.access_token);
 			tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
+
+			await tryRetweet(c, tweetIds[0]);
 		}
 
 		// Claim points

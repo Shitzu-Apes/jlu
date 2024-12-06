@@ -11,6 +11,8 @@ declare module 'hono' {
 			TWITTER_CLIENT_SECRET: string;
 			OPENAI_API_KEY: string;
 			DEV: string;
+			TWITTER_LUCY_USER_ID: string;
+			TWITTER_BEARER_TOKEN: string;
 		};
 		Variables: {
 			session: Auth;
