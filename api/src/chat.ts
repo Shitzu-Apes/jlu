@@ -541,6 +541,21 @@ export class FlirtBattle extends DurableObject {
 
 export const chat = new Hono<Env>()
 	.use('*', requireAuth)
+	.get('/', async (c) => {
+		const session = c.get('session');
+
+		// Get or create FlirtBattle DO for this user
+		const flirtBattleDO = c.env.FLIRTBATTLE.get(c.env.FLIRTBATTLE.idFromName(session.user.id));
+
+		// Get current conversation
+		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin);
+		if (!response.ok) {
+			return c.text('Failed to get conversation', { status: response.status });
+		}
+
+		const result = await response.json<FlirtBattleResponse>();
+		return c.json(result);
+	})
 	.get('/history', async (c) => {
 		const session = c.get('session');
 
