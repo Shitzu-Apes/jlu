@@ -290,6 +290,8 @@
 			loadHistory();
 		}
 	});
+
+	$: hasEnoughWords = conversation.length === 0 || newMessage.trim().split(/\s+/).length >= 2;
 </script>
 
 <div class="flex md:flex-row flex-col h-full w-full max-w-5xl">
@@ -649,7 +651,11 @@
 							</div>
 							<button
 								on:click={sendMessage}
-								disabled={isLoading || !canSendMessage || !newMessage.trim() || isMessageTooLong}
+								disabled={isLoading ||
+									!canSendMessage ||
+									!newMessage.trim() ||
+									isMessageTooLong ||
+									!hasEnoughWords}
 								class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 								aria-label="Send"
 							>
