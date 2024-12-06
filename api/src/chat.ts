@@ -3,11 +3,12 @@ import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
 import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { OpenAI } from 'openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
 import { requireAuth } from './middleware/auth';
 
-// Define the mood schema
+// Response schemas
 const LucyMood = z.enum([
 	'angry',
 	'annoyed',
@@ -27,13 +28,35 @@ const LucyMood = z.enum([
 	'surprised'
 ]);
 
-// Define the response schema
 const LucyResponse = z.object({
 	message: z.string(),
 	mood: LucyMood,
-	points: z.number().optional(),
-	evaluation: z.string().optional()
+	finished: z.boolean().optional()
 });
+
+const EvaluationResponse = z.object({
+	points: z.number().min(1).max(100),
+	evaluation: z.string().max(200)
+});
+
+// Message types
+interface BaseMessage {
+	message: string;
+}
+
+interface UserMessage extends BaseMessage {
+	sender: 'user';
+}
+
+interface LucyMessage extends BaseMessage {
+	sender: 'lucy';
+	mood: z.infer<typeof LucyMood>;
+	finished?: boolean;
+	points?: number;
+	evaluation?: string;
+}
+
+type Message = UserMessage | LucyMessage;
 
 // Get exact token count using tiktoken
 function countTokens(text: string, model: TiktokenModel): number {
@@ -102,27 +125,6 @@ type LucyMood =
 	| 'shy'
 	| 'surprised';
 
-// Base message type
-type BaseMessage = {
-	message: string;
-	points?: number;
-	evaluation?: string;
-};
-
-// User message type
-type UserMessage = BaseMessage & {
-	sender: 'user';
-};
-
-// Lucy message type
-type LucyMessage = BaseMessage & {
-	sender: 'lucy';
-	mood: LucyMood;
-};
-
-// Combined message type
-type Message = UserMessage | LucyMessage;
-
 // GPT response type (Lucy's message without sender)
 type LucyResponse = Omit<LucyMessage, 'sender'>;
 
@@ -137,7 +139,7 @@ type FlirtBattleResponse = {
 // Lucy's prompt
 const LUCY_PROMPT = `You are a fictional sexy female character. I am a web3 guy who is trying to flirt with you. I am simping for you.
 
-I am about to initiate the conversation. We will chat for a bit. You may respond between 5 to 10 times. After the maximum amount of responses is reached, you have to give my flirting a rank between 1 and 100 points. You can finish the conversation early, if you feel like it should be over. Be honest in your ranking. Don't give out too many points too easily. Try to keep the conversation on topic. Punish low effort and low quality responses.
+I am about to initiate the conversation. We will chat for a bit. You may respond between 5 to 10 times. You can finish the conversation early, if you feel like it should be over. Be honest in your ranking. Don't give out too many points too easily. Try to keep the conversation on topic. Punish low effort and low quality responses.
 
 Lucy's background story and personality traits look as follows:
 
@@ -168,12 +170,9 @@ Besides giving me a response, you also need to define your mood. You can pick on
 flirty, happy, sassy, excited, pouty, shy, confident, embarrassed, playful, curious, angry, sad, surprised, dreamy, confused, annoyed
 
 Every response should be given as a JSON including following fields:
-- message: your response
-- mood: all lowercase mood taken from the list above
-
-The final result you give me should have these additional fields:
-- points: number between 1 and 100
-- evaluation: your reasoning behind the number of points`;
+- message: your response (always required)
+- mood: all lowercase mood taken from the list above (always required)
+- finished: boolean (optional, set to true when conversation should be over)`;
 
 // Conversation with metadata
 type Conversation = {
@@ -357,6 +356,63 @@ async function tryRetweet(c: Context<Env>, tweetId: string): Promise<void> {
 	}
 }
 
+async function evaluateConversation(
+	messages: Message[],
+	c: Context<Env>
+): Promise<{ points: number; evaluation: string }> {
+	const openai = new OpenAI({
+		apiKey: c.env.OPENAI_API_KEY
+	});
+
+	const chatMessages = messages.map((msg) => ({
+		role: msg.sender === 'user' ? ('user' as const) : ('assistant' as const),
+		content: msg.message
+	}));
+
+	const evaluationPrompt = {
+		role: 'system' as const,
+		content: `You are now evaluating the conversation that just happened. Analyze how well the user flirted with Lucy.
+Respond in JSON format with:
+{
+  "points": number (1-100),
+  "evaluation": string (1-2 sentences explaining the score)
+}
+
+High scores (80-100) for being smooth, witty, and making Lucy laugh
+Medium scores (50-79) for decent attempts that could use improvement
+Low scores (1-49) for awkward, creepy, low effort or inappropriate behavior`
+	};
+
+	const { messages: preparedMessages, model } = await prepareConversation(
+		[
+			{
+				role: 'system',
+				content: LUCY_PROMPT
+			},
+			...chatMessages,
+			evaluationPrompt
+		],
+		true,
+		100
+	);
+
+	const completion = await openai.beta.chat.completions.parse({
+		model,
+		messages: preparedMessages,
+		response_format: zodResponseFormat(EvaluationResponse, 'response')
+	});
+
+	const result = completion.choices[0].message.parsed;
+	if (!result) {
+		return {
+			points: 1,
+			evaluation: 'Not bad, but you can do better!'
+		};
+	}
+
+	return result;
+}
+
 export class FlirtBattle extends DurableObject {
 	private currentConversation: Conversation | null;
 	private lastConversationEnd: number | null;
@@ -420,9 +476,10 @@ export class FlirtBattle extends DurableObject {
 					}
 
 					// Check if conversation has ended
-					const lastMessage =
-						this.currentConversation.messages[this.currentConversation.messages.length - 1];
-					if (!lastMessage?.points || !lastMessage?.evaluation) {
+					const lastMessage = this.currentConversation.messages[
+						this.currentConversation.messages.length - 1
+					] as LucyMessage | undefined;
+					if (!lastMessage?.finished) {
 						return c.json(
 							{
 								error: 'Conversation has not ended yet'
@@ -716,47 +773,50 @@ export const chat = new Hono<Env>()
 		});
 
 		// Parse and validate response
-		const rawContent = completion.choices[0].message.content || '{}';
-		console.log('[chat] Raw OpenAI response:', rawContent);
-
-		let rawResponse;
-		try {
-			rawResponse = JSON.parse(rawContent);
-			console.log('[chat] Parsed response:', rawResponse);
-		} catch (error) {
-			console.error('[chat] Failed to parse OpenAI response:', error);
-			return c.json({ error: 'Failed to parse OpenAI response' }, { status: 500 });
-		}
-
+		const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
 		const parseResult = LucyResponse.safeParse(rawResponse);
 
-		const lucyResponse = parseResult.success
+		const lucyMessage = parseResult.success
 			? parseResult.data
 			: ({
 					...rawResponse,
 					mood: 'curious' // Fallback mood if validation fails
 				} as LucyResponse);
+		if (!lucyMessage.message) {
+			lucyMessage.message = 'I am sorry, I do not know what to say.';
+		}
+		console.log('[chat] Response sent:', lucyMessage, `(using ${model}, ${tokenCount} tokens)`);
 
-		console.log('[chat] Response sent:', lucyResponse, `(using ${model}, ${tokenCount} tokens)`);
-		if (!parseResult.success) {
-			console.warn(
-				'[chat] Invalid mood from OpenAI:',
-				rawResponse.mood,
-				'Validation error:',
-				parseResult.error
-			);
+		// If conversation is finished, get evaluation
+		if (lucyMessage.finished) {
+			const { points, evaluation } = await evaluateConversation(currentMessages, c);
+			const finalMessage: LucyMessage = {
+				sender: 'lucy',
+				...lucyMessage,
+				points,
+				evaluation
+			};
+
+			// Add both messages to conversation in a single request
+			const finalResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify([userMessage, finalMessage])
+			});
+
+			return finalResponse;
 		}
 
 		// Add both messages to conversation in a single request
-		const finalResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
+		const chatResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify([userMessage, { sender: 'lucy', ...lucyResponse }])
+			body: JSON.stringify([userMessage, { sender: 'lucy', ...lucyMessage }])
 		});
 
-		// Return the updated conversation with cooldown info
-		const result = await finalResponse.json<FlirtBattleResponse>();
-		return c.json(result);
+		return chatResponse;
 	});
