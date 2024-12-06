@@ -60,7 +60,7 @@ auth.get('/authorize', async (c) => {
 		response_type: 'code',
 		client_id: c.env.TWITTER_CLIENT_ID,
 		redirect_uri: redirectUrl,
-		scope: 'tweet.read users.read offline.access',
+		scope: 'tweet.read tweet.write users.read offline.access',
 		state: nonce,
 		code_challenge: codeChallenge,
 		code_challenge_method: 'S256'

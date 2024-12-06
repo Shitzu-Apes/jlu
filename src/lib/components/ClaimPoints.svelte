@@ -33,9 +33,11 @@
 				return;
 			}
 
+			const { tweetUrl } = await response.json<{ tweetUrl: string }>();
 			showToast('Points claimed successfully! Check your wallet soon.', 'success');
 			onClaim();
 			closeBottomSheet();
+			window.open(tweetUrl, '_blank');
 		} catch (err) {
 			console.error('Error claiming points:', err);
 			showToast('Failed to claim points. Please try again later.');

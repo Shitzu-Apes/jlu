@@ -1,9 +1,57 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { Context, Env } from 'hono';
+import type { Env } from 'hono';
 import { Hono } from 'hono';
+import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { OpenAI } from 'openai';
 
 import { requireAuth } from './middleware/auth';
+
+// Get exact token count using tiktoken
+function countTokens(text: string, model: TiktokenModel): number {
+	const enc = encodingForModel(model);
+	const tokens = enc.encode(text);
+	return tokens.length;
+}
+
+type ModelSelection = {
+	model: TiktokenModel;
+	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+	tokenCount: number;
+};
+
+function prepareConversation(
+	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+	maxTokensForResponse = 1000
+): ModelSelection {
+	// Start with standard model
+	let model: TiktokenModel = 'gpt-3.5-turbo';
+	let tokenLimit = 4096;
+
+	// Count tokens for all messages
+	let totalTokens = messages.reduce((sum, msg) => sum + countTokens(msg.content, model), 0);
+
+	// If we're close to the 4K limit (leaving room for response), switch to 16K model
+	if (totalTokens + maxTokensForResponse > 3500) {
+		model = 'gpt-3.5-turbo-16k';
+		tokenLimit = 16384;
+	}
+
+	// If we're still over the limit, truncate oldest messages after system message
+	const truncatedMessages = [...messages];
+	while (totalTokens + maxTokensForResponse > tokenLimit - 500 && truncatedMessages.length > 2) {
+		// Remove the second message (first after system)
+		truncatedMessages.splice(1, 1);
+
+		// Recalculate total tokens
+		totalTokens = truncatedMessages.reduce((sum, msg) => sum + countTokens(msg.content, model), 0);
+	}
+
+	return {
+		model,
+		messages: truncatedMessages,
+		tokenCount: totalTokens
+	};
+}
 
 // All possible moods that Lucy can have
 type LucyMood =
@@ -48,10 +96,12 @@ type Message = UserMessage | LucyMessage;
 // GPT response type (Lucy's message without sender)
 type LucyResponse = Omit<LucyMessage, 'sender'>;
 
-// Convert conversation history to ChatGPT messages format
-type ChatMessage = {
-	role: 'system' | 'user' | 'assistant';
-	content: string;
+// Response type from FlirtBattle DO
+type FlirtBattleResponse = {
+	messages: Message[];
+	cooldownEnds: number | null;
+	canSendMessage: boolean;
+	error?: string;
 };
 
 // Lucy's prompt
@@ -94,14 +144,6 @@ Every response should be given as a JSON including following fields:
 The final result you give me should have these additional fields:
 - points: number between 1 and 100
 - evaluation: your reasoning behind the number of points`;
-
-// Response type from FlirtBattle DO
-type FlirtBattleResponse = {
-	messages: Message[];
-	cooldownEnds: number | null;
-	canSendMessage: boolean;
-	error?: string;
-};
 
 // Conversation with metadata
 type Conversation = {
@@ -301,9 +343,9 @@ export class FlirtBattle extends DurableObject {
 	}
 }
 
-export const chat = new Hono()
+export const chat = new Hono<Env>()
 	.use('*', requireAuth)
-	.get('/history', async (c: Context<Env>) => {
+	.get('/history', async (c) => {
 		const session = c.get('session');
 
 		// Get or create FlirtBattle DO for this user
@@ -318,78 +360,15 @@ export const chat = new Hono()
 		const result = (await response.json()) as { history: Conversation[] };
 		return c.json(result);
 	})
-	.get('/', async (c: Context<Env>) => {
+	.post('/claim', async (c) => {
+		const { walletAddress } = await c.req.json<{ walletAddress: string }>();
 		const session = c.get('session');
 
 		// Get or create FlirtBattle DO for this user
 		const flirtBattleDO = c.env.FLIRTBATTLE.get(c.env.FLIRTBATTLE.idFromName(session.user.id));
 
-		// Get current conversation
-		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin);
-		if (!response.ok) {
-			return c.text('Failed to get conversation', { status: response.status });
-		}
-
-		const result = (await response.json()) as FlirtBattleResponse;
-		return c.json(result);
-	})
-	.post('/claim', async (c: Context<Env>) => {
-		const session = c.get('session');
-		const { walletAddress } = await c.req.json<{ walletAddress: string }>();
-
-		if (!walletAddress) {
-			return c.text('Wallet address is required', { status: 400 });
-		}
-
-		// Get the user's conversation
-		const flirtBattleDO = c.env.FLIRTBATTLE.get(c.env.FLIRTBATTLE.idFromName(session.user.id));
-		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin);
-		if (!response.ok) {
-			return c.text('Failed to get conversation', { status: response.status });
-		}
-
-		const { messages, cooldownEnds } = (await response.json()) as FlirtBattleResponse;
-		const lastMessage = messages[messages.length - 1];
-
-		// Check if conversation has ended (has points and evaluation)
-		if (!lastMessage?.points || !lastMessage?.evaluation) {
-			return c.text('Conversation has not ended yet', { status: 400 });
-		}
-
-		// TODO: Post conversation to X using Lucy's account
-		// This will require Lucy's API credentials which we'll add later
-		// const lucyTweetId = await postAsLucy(messages);
-		// if (!lucyTweetId) {
-		//   return c.text('Failed to post conversation', { status: 500 });
-		// }
-
-		// Retweet from user's account
-		let retweetSuccess = false;
-		try {
-			// TODO: Replace with actual retweet once we have Lucy's tweet ID
-			// const retweetResponse = await fetch('https://api.x.com/2/tweets', {
-			//   method: 'POST',
-			//   headers: {
-			//     Authorization: `Bearer ${session.token.access_token}`,
-			//     'Content-Type': 'application/json'
-			//   },
-			//   body: JSON.stringify({
-			//     // Retweet payload using lucyTweetId
-			//   })
-			// });
-			// retweetSuccess = retweetResponse.ok;
-			retweetSuccess = true; // Temporary until X integration is complete
-		} catch (err) {
-			console.error('Failed to retweet:', err);
-			return c.text('Failed to retweet conversation', { status: 500 });
-		}
-
-		if (!retweetSuccess) {
-			return c.text('Failed to retweet conversation', { status: 500 });
-		}
-
-		// Only reset conversation if retweet succeeded
-		await flirtBattleDO.fetch(new URL(c.req.url).origin, {
+		// Claim points
+		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
@@ -400,20 +379,20 @@ export const chat = new Hono()
 			})
 		});
 
-		return c.json({
-			success: true,
-			points: lastMessage.points,
-			evaluation: lastMessage.evaluation,
-			cooldownEnds
-		});
+		if (!response.ok) {
+			return c.text('Failed to claim points', { status: response.status });
+		}
+
+		const result = await response.json<FlirtBattleResponse>();
+		return c.json(result);
 	})
-	.post('/', async (c: Context<Env>) => {
+	.post('/', async (c) => {
 		const session = c.get('session');
 
 		// Get user message from request body
 		const { message } = await c.req.json<{ message: string }>();
 		if (!message) {
-			return c.text('Message is required', 400);
+			return c.text('Message is required', { status: 400 });
 		}
 
 		// Get or create FlirtBattle DO for this user
@@ -425,7 +404,7 @@ export const chat = new Hono()
 			messages: currentMessages,
 			canSendMessage,
 			cooldownEnds
-		} = (await response.json()) as FlirtBattleResponse;
+		} = await response.json<FlirtBattleResponse>();
 
 		// Check if user can send a message
 		if (!canSendMessage) {
@@ -434,7 +413,7 @@ export const chat = new Hono()
 					error: 'Conversation in cooldown',
 					cooldownEnds
 				},
-				403
+				{ status: 403 }
 			);
 		}
 
@@ -450,8 +429,8 @@ export const chat = new Hono()
 		};
 
 		// Convert conversation history to ChatGPT messages format
-		const chatHistory: ChatMessage[] = currentMessages.map((msg) => ({
-			role: msg.sender === 'user' ? 'user' : 'assistant',
+		const chatHistory = currentMessages.map((msg: Message) => ({
+			role: msg.sender === 'user' ? ('user' as const) : ('assistant' as const),
 			content:
 				msg.sender === 'user'
 					? msg.message
@@ -463,10 +442,12 @@ export const chat = new Hono()
 						})
 		}));
 
-		// Get AI response
-		const completion = await openai.chat.completions.create({
-			model: 'gpt-4-turbo-preview',
-			messages: [
+		const {
+			model,
+			messages: truncatedMessages,
+			tokenCount
+		} = prepareConversation(
+			[
 				{
 					role: 'system',
 					content: LUCY_PROMPT
@@ -474,6 +455,13 @@ export const chat = new Hono()
 				...chatHistory,
 				{ role: 'user', content: message }
 			],
+			100
+		);
+
+		// Get AI response
+		const completion = await openai.chat.completions.create({
+			model,
+			messages: truncatedMessages,
 			response_format: { type: 'json_object' }
 		});
 
@@ -489,10 +477,14 @@ export const chat = new Hono()
 		// Add both messages to conversation in a single request
 		const finalResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
 			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
 			body: JSON.stringify([userMessage, lucyMessage])
 		});
 
 		// Return the updated conversation with cooldown info
-		const result = (await finalResponse.json()) as FlirtBattleResponse;
+		const result = await finalResponse.json<FlirtBattleResponse>();
+		console.log('[chat] Response sent:', lucyResponse, `(using ${model}, ${tokenCount} tokens)`);
 		return c.json(result);
 	});
