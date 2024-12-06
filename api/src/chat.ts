@@ -3,8 +3,38 @@ import type { Env } from 'hono';
 import { Hono } from 'hono';
 import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { OpenAI } from 'openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import { z } from 'zod';
 
 import { requireAuth } from './middleware/auth';
+
+// Define the mood schema
+const LucyMood = z.enum([
+	'angry',
+	'annoyed',
+	'confident',
+	'confused',
+	'curious',
+	'dreamy',
+	'embarrassed',
+	'excited',
+	'flirty',
+	'happy',
+	'playful',
+	'pouty',
+	'sad',
+	'sassy',
+	'shy',
+	'surprised'
+]);
+
+// Define the response schema
+const LucyResponse = z.object({
+	message: z.string(),
+	mood: LucyMood,
+	points: z.number().optional(),
+	evaluation: z.string().optional()
+});
 
 // Get exact token count using tiktoken
 function countTokens(text: string, model: TiktokenModel): number {
@@ -742,14 +772,17 @@ export const chat = new Hono<Env>()
 		);
 
 		// Get AI response
-		const completion = await openai.chat.completions.create({
+		const completion = await openai.beta.chat.completions.parse({
 			model,
 			messages: truncatedMessages,
-			response_format: { type: 'json_object' }
+			response_format: zodResponseFormat(LucyResponse, 'response')
 		});
 
 		// Parse AI response
-		const lucyResponse = JSON.parse(completion.choices[0].message.content || '{}') as LucyResponse;
+		const lucyResponse = completion.choices[0].message.parsed;
+		if (!lucyResponse) {
+			return c.text('Failed to get response', { status: 500 });
+		}
 
 		// Convert to Message type
 		const lucyMessage: Message = {
