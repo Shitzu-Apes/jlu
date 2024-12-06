@@ -204,6 +204,9 @@
 		}
 	}
 
+	const MAX_MESSAGE_LENGTH = 200;
+	$: isMessageTooLong = (newMessage?.length ?? 0) > MAX_MESSAGE_LENGTH;
+
 	async function sendMessage() {
 		if (!newMessage.trim() || isLoading) return;
 
@@ -626,18 +629,27 @@
 									</div>
 								</div>
 							</div>
-							<input
-								type="text"
-								bind:value={newMessage}
-								bind:this={inputRef}
-								on:keydown={handleKeyDown}
-								disabled={isLoading || !canSendMessage}
-								class="flex-1 bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed"
-								placeholder="Send a message..."
-							/>
+							<div class="flex-1 flex flex-col gap-1">
+								<input
+									type="text"
+									bind:value={newMessage}
+									bind:this={inputRef}
+									on:keydown={handleKeyDown}
+									disabled={isLoading || !canSendMessage}
+									class="w-full bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed {isMessageTooLong
+										? 'border-red-500'
+										: ''}"
+									placeholder="Send a message..."
+								/>
+								{#if isMessageTooLong}
+									<div class="text-sm text-red-500">
+										Message too long (max {MAX_MESSAGE_LENGTH} characters)
+									</div>
+								{/if}
+							</div>
 							<button
 								on:click={sendMessage}
-								disabled={isLoading || !canSendMessage || !newMessage.trim()}
+								disabled={isLoading || !canSendMessage || !newMessage.trim() || isMessageTooLong}
 								class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 								aria-label="Send"
 							>
