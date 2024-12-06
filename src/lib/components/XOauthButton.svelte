@@ -1,8 +1,8 @@
 <script lang="ts">
+	import { fetchApi } from '$lib/api';
+
 	async function handleSignIn() {
-		const nonce = await fetch(`${import.meta.env.VITE_API_URL}/auth/nonce`).then((res) =>
-			res.text()
-		);
+		const nonce = await fetchApi('/auth/nonce').then((res) => res.text());
 		sessionStorage.setItem('nonce', nonce);
 
 		window.location.href = `${import.meta.env.VITE_API_URL}/auth/authorize?nonce=${nonce}&redirect_url=${window.location.origin}`;

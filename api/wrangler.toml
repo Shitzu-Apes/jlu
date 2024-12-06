@@ -10,8 +10,7 @@ enabled = true
 mode = "smart"
 
 [vars]
-TWITTER_CLIENT_ID = "VXNlckNsaWVudDpLbmxYbWxKbGJuUTZWWE5sY2tOc2FXVnVkRHBMYm14WWJXeFNiakp3YTFwMlRtdHNiVTVZVVRBPQ"
-DEV = "1"
+TWITTER_CLIENT_ID = "V1pmZnRIcTJqZnNNbFNILTNnQXI6MTpjaQ"
 
 [durable_objects]
 bindings = [

@@ -1,17 +1,47 @@
 <script lang="ts">
-	import { Content } from '$lib/layout/BottomSheet';
+	import { showToast } from './Toast.svelte';
+
+	import { fetchApi } from '$lib/api';
+	import { Content, closeBottomSheet } from '$lib/layout/BottomSheet';
 
 	export let points: number;
 	export let evaluation: string;
+	export let onClaim: () => void;
 
 	let walletAddress = '';
 	let isSubmitting = false;
 
 	async function handleClaim() {
-		if (!walletAddress.trim()) return;
+		if (!walletAddress.trim() || isSubmitting) return;
+
 		isSubmitting = true;
-		// TODO: Implement claim logic
-		isSubmitting = false;
+		try {
+			const response = await fetchApi('/chat/claim', {
+				method: 'POST',
+				body: { walletAddress }
+			});
+
+			if (!response.ok) {
+				if (response.status === 401) {
+					showToast('Session expired. Please login again.');
+					closeBottomSheet();
+					return;
+				}
+				const error = await response.text();
+				console.error('Failed to claim points:', error);
+				showToast('Failed to claim points. Please try again later.');
+				return;
+			}
+
+			showToast('Points claimed successfully! Check your wallet soon.', 'success');
+			onClaim();
+			closeBottomSheet();
+		} catch (err) {
+			console.error('Error claiming points:', err);
+			showToast('Failed to claim points. Please try again later.');
+		} finally {
+			isSubmitting = false;
+		}
 	}
 </script>
 

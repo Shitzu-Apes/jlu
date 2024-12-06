@@ -57,7 +57,7 @@ type ChatMessage = {
 // Lucy's prompt
 const LUCY_PROMPT = `You are a fictional sexy female character. I am a web3 guy who is trying to flirt with you. I am simping for you.
 
-I am about to initiate the conversation. We will chat for a bit. You may respond between 5 to 10 times. After the maximum amount of responses is reached, you have to give my flirting a rank between 1 and 100 points. You can finish the conversation early, if you feel like it should be over. Be honest in your ranking. Don't give out too many points too easily. Try to keep the conversation on topic.
+I am about to initiate the conversation. We will chat for a bit. You may respond between 5 to 10 times. After the maximum amount of responses is reached, you have to give my flirting a rank between 1 and 100 points. You can finish the conversation early, if you feel like it should be over. Be honest in your ranking. Don't give out too many points too easily. Try to keep the conversation on topic. Punish low effort and low quality responses.
 
 Lucy's background story and personality traits look as follows:
 
@@ -147,6 +147,9 @@ export class FlirtBattle extends DurableObject {
 		this.hono = new Hono();
 
 		this.hono
+			.get('/history', async (c) => {
+				return c.json({ history: this.conversationHistory });
+			})
 			.get('*', async (c) => {
 				const { cooldownEnds, canSendMessage } = this.getCooldownStatus();
 				return c.json({
@@ -156,6 +159,59 @@ export class FlirtBattle extends DurableObject {
 				});
 			})
 			.post('*', async (c) => {
+				const body = await c.req.json();
+
+				// Handle claim action
+				if (body.action === 'claim') {
+					if (!this.currentConversation) {
+						return c.json(
+							{
+								error: 'No active conversation'
+							},
+							400
+						);
+					}
+
+					// Check if conversation has ended
+					const lastMessage =
+						this.currentConversation.messages[this.currentConversation.messages.length - 1];
+					if (!lastMessage?.points || !lastMessage?.evaluation) {
+						return c.json(
+							{
+								error: 'Conversation has not ended yet'
+							},
+							400
+						);
+					}
+
+					// Store conversation in history
+					const historyKey = `history:${this.currentConversation.startedAt}`;
+					await this.state.storage.put(historyKey, {
+						...this.currentConversation,
+						walletAddress: body.walletAddress,
+						claimedAt: Date.now()
+					});
+					this.conversationHistory.unshift(this.currentConversation);
+
+					// Reset current conversation
+					this.currentConversation = null;
+					this.lastConversationEnd = Date.now();
+
+					// Save state
+					await this.state.storage.put('state', {
+						currentConversation: this.currentConversation,
+						lastConversationEnd: this.lastConversationEnd
+					});
+
+					const { cooldownEnds, canSendMessage } = this.getCooldownStatus();
+					return c.json({
+						messages: [],
+						cooldownEnds,
+						canSendMessage
+					});
+				}
+
+				// Handle new messages
 				const { cooldownEnds, canSendMessage } = this.getCooldownStatus();
 
 				// Check if user is in cooldown
@@ -171,7 +227,7 @@ export class FlirtBattle extends DurableObject {
 					);
 				}
 
-				const newMessages = await c.req.json<Message[]>();
+				const newMessages = body as Message[];
 				const now = Date.now();
 
 				// Start a new conversation if needed
@@ -226,9 +282,6 @@ export class FlirtBattle extends DurableObject {
 					cooldownEnds: newCooldownEnds,
 					canSendMessage: newCanSendMessage
 				});
-			})
-			.get('/history', async (c) => {
-				return c.json({ history: this.conversationHistory });
 			});
 	}
 
@@ -250,6 +303,21 @@ export class FlirtBattle extends DurableObject {
 
 export const chat = new Hono()
 	.use('*', requireAuth)
+	.get('/history', async (c: Context<Env>) => {
+		const session = c.get('session');
+
+		// Get or create FlirtBattle DO for this user
+		const flirtBattleDO = c.env.FLIRTBATTLE.get(c.env.FLIRTBATTLE.idFromName(session.user.id));
+
+		// Get conversation history
+		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin + '/history');
+		if (!response.ok) {
+			return c.text('Failed to get history', { status: response.status });
+		}
+
+		const result = (await response.json()) as { history: Conversation[] };
+		return c.json(result);
+	})
 	.get('/', async (c: Context<Env>) => {
 		const session = c.get('session');
 
@@ -264,6 +332,80 @@ export const chat = new Hono()
 
 		const result = (await response.json()) as FlirtBattleResponse;
 		return c.json(result);
+	})
+	.post('/claim', async (c: Context<Env>) => {
+		const session = c.get('session');
+		const { walletAddress } = await c.req.json<{ walletAddress: string }>();
+
+		if (!walletAddress) {
+			return c.text('Wallet address is required', { status: 400 });
+		}
+
+		// Get the user's conversation
+		const flirtBattleDO = c.env.FLIRTBATTLE.get(c.env.FLIRTBATTLE.idFromName(session.user.id));
+		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin);
+		if (!response.ok) {
+			return c.text('Failed to get conversation', { status: response.status });
+		}
+
+		const { messages, cooldownEnds } = (await response.json()) as FlirtBattleResponse;
+		const lastMessage = messages[messages.length - 1];
+
+		// Check if conversation has ended (has points and evaluation)
+		if (!lastMessage?.points || !lastMessage?.evaluation) {
+			return c.text('Conversation has not ended yet', { status: 400 });
+		}
+
+		// TODO: Post conversation to X using Lucy's account
+		// This will require Lucy's API credentials which we'll add later
+		// const lucyTweetId = await postAsLucy(messages);
+		// if (!lucyTweetId) {
+		//   return c.text('Failed to post conversation', { status: 500 });
+		// }
+
+		// Retweet from user's account
+		let retweetSuccess = false;
+		try {
+			// TODO: Replace with actual retweet once we have Lucy's tweet ID
+			// const retweetResponse = await fetch('https://api.x.com/2/tweets', {
+			//   method: 'POST',
+			//   headers: {
+			//     Authorization: `Bearer ${session.token.access_token}`,
+			//     'Content-Type': 'application/json'
+			//   },
+			//   body: JSON.stringify({
+			//     // Retweet payload using lucyTweetId
+			//   })
+			// });
+			// retweetSuccess = retweetResponse.ok;
+			retweetSuccess = true; // Temporary until X integration is complete
+		} catch (err) {
+			console.error('Failed to retweet:', err);
+			return c.text('Failed to retweet conversation', { status: 500 });
+		}
+
+		if (!retweetSuccess) {
+			return c.text('Failed to retweet conversation', { status: 500 });
+		}
+
+		// Only reset conversation if retweet succeeded
+		await flirtBattleDO.fetch(new URL(c.req.url).origin, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				action: 'claim',
+				walletAddress
+			})
+		});
+
+		return c.json({
+			success: true,
+			points: lastMessage.points,
+			evaluation: lastMessage.evaluation,
+			cooldownEnds
+		});
 	})
 	.post('/', async (c: Context<Env>) => {
 		const session = c.get('session');

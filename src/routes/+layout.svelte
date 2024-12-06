@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 
 	import { goto } from '$app/navigation';
+	import { fetchApi } from '$lib/api';
 	import { session$, type Auth } from '$lib/auth';
 	import Toast, { showToast } from '$lib/components/Toast.svelte';
 	import { BottomSheet } from '$lib/layout/BottomSheet';
@@ -33,9 +34,7 @@
 			url.searchParams.delete('code');
 			goto(url.href, { replaceState: true, noScroll: true });
 
-			fetch(
-				`${import.meta.env.VITE_API_URL}/auth/login?code=${code}&nonce=${nonce}&redirect_url=${window.location.origin}`
-			)
+			fetchApi(`/auth/login?code=${code}&nonce=${nonce}&redirect_url=${window.location.origin}`)
 				.then(async (res) => {
 					if (!res.ok) {
 						const error = await res.text();
@@ -66,17 +65,39 @@
 			$session$ = Promise.resolve(undefined);
 			return;
 		}
-		const auth: Auth = JSON.parse(authString);
 
-		// Check if token has expired
-		const now = Date.now();
-		if (auth.expires_at < now) {
+		try {
+			const auth: Auth = JSON.parse(authString);
+
+			// Check if token has expired
+			const now = Date.now();
+			if (!auth?.token?.access_token || !auth?.user?.id || auth.expires_at < now) {
+				console.log('[auth] Invalid or expired session, clearing');
+				localStorage.removeItem('auth');
+				$session$ = Promise.resolve(undefined);
+				return;
+			}
+
+			// Validate session with backend
+			fetchApi('/chat')
+				.then((res) => {
+					if (!res.ok) {
+						console.log('[auth] Backend validation failed, clearing session');
+						localStorage.removeItem('auth');
+						$session$ = Promise.resolve(undefined);
+						return;
+					}
+					$session$ = Promise.resolve(auth);
+				})
+				.catch(() => {
+					// Network error, but don't clear session yet
+					$session$ = Promise.resolve(auth);
+				});
+		} catch (err) {
+			console.error('[auth] Failed to parse session:', err);
 			localStorage.removeItem('auth');
 			$session$ = Promise.resolve(undefined);
-			return;
 		}
-
-		$session$ = Promise.resolve(auth);
 	});
 </script>
 
