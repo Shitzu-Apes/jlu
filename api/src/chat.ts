@@ -50,10 +50,11 @@ type ModelSelection = {
 
 function prepareConversation(
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+	useGpt4 = false,
 	maxTokensForResponse = 1000
 ): ModelSelection {
 	// Start with standard model
-	let model: TiktokenModel = 'gpt-3.5-turbo';
+	let model: TiktokenModel = useGpt4 ? 'gpt-4-turbo' : 'gpt-3.5-turbo';
 	let tokenLimit = 4096;
 
 	// Count tokens for all messages
@@ -61,7 +62,7 @@ function prepareConversation(
 
 	// If we're close to the 4K limit (leaving room for response), switch to 16K model
 	if (totalTokens + maxTokensForResponse > 3500) {
-		model = 'gpt-3.5-turbo-16k';
+		model = useGpt4 ? ('gpt-4-turbo-16k' as TiktokenModel) : ('gpt-3.5-turbo-16k' as TiktokenModel);
 		tokenLimit = 16384;
 	}
 
@@ -216,13 +217,13 @@ Respond with a JSON object containing a single boolean field "isWorthSharing" in
 		model,
 		messages: truncatedMessages,
 		tokenCount
-	} = prepareConversation(formattedMessages, 10);
+	} = prepareConversation(formattedMessages, true, 10);
 
 	const response = await openai.chat.completions.create({
 		model,
 		messages: truncatedMessages,
 		temperature: 0.7,
-		max_tokens: 10,
+		max_tokens: 15,
 		response_format: { type: 'json_object' }
 	});
 
@@ -270,6 +271,8 @@ async function createThread(
 	token: string
 ): Promise<string[]> {
 	const tweetIds: string[] = [];
+	console.log('[share] Creating thread');
+	console.log(messages, points, evaluation);
 
 	// First tweet: Score and evaluation
 	const truncatedEvaluation =
@@ -421,6 +424,8 @@ export class FlirtBattle extends DurableObject {
 				const { cooldownEnds, canSendMessage } = this.getCooldownStatus();
 				return c.json({
 					messages: this.currentConversation?.messages ?? [],
+					points: this.currentConversation?.points,
+					evaluation: this.currentConversation?.evaluation,
 					cooldownEnds,
 					canSendMessage
 				});
@@ -767,6 +772,7 @@ export const chat = new Hono<Env>()
 				...chatHistory,
 				{ role: 'user', content: message }
 			],
+			false,
 			100
 		);
 
@@ -778,7 +784,18 @@ export const chat = new Hono<Env>()
 		});
 
 		// Parse and validate response
-		const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
+		const rawContent = completion.choices[0].message.content || '{}';
+		console.log('[chat] Raw OpenAI response:', rawContent);
+
+		let rawResponse;
+		try {
+			rawResponse = JSON.parse(rawContent);
+			console.log('[chat] Parsed response:', rawResponse);
+		} catch (error) {
+			console.error('[chat] Failed to parse OpenAI response:', error);
+			return c.json({ error: 'Failed to parse OpenAI response' }, { status: 500 });
+		}
+
 		const parseResult = LucyResponse.safeParse(rawResponse);
 
 		const lucyResponse = parseResult.success
