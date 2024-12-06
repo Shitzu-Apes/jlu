@@ -184,86 +184,6 @@ type Conversation = {
 	evaluation?: string;
 };
 
-async function isConversationWorthSharing(messages: Message[], apiKey: string): Promise<boolean> {
-	const openai = new OpenAI({
-		apiKey
-	});
-
-	const systemPrompt = `You are an expert at evaluating flirty conversations between users and Lucy, an AI character.
-Your task is to determine if a conversation is entertaining and fun enough to be shared publicly.
-
-Criteria for a good conversation:
-- Witty exchanges
-- Clever responses
-- Good chemistry
-- Entertaining dialogue
-- No inappropriate content
-- Natural flow
-
-Respond with a JSON object containing a single boolean field "isWorthSharing" indicating if the conversation meets these criteria.`;
-
-	// Format messages for evaluation
-	const formattedMessages = [
-		{ role: 'system' as const, content: systemPrompt },
-		{
-			role: 'user' as const,
-			content: messages
-				.map((m) => `${m.sender === 'user' ? 'User' : 'Lucy'}: ${m.message}`)
-				.join('\n')
-		}
-	];
-
-	const {
-		model,
-		messages: truncatedMessages,
-		tokenCount
-	} = prepareConversation(formattedMessages, true, 10);
-
-	const response = await openai.chat.completions.create({
-		model,
-		messages: truncatedMessages,
-		temperature: 0.7,
-		max_tokens: 15,
-		response_format: { type: 'json_object' }
-	});
-
-	const result = JSON.parse(response.choices[0].message.content || '{}') as {
-		isWorthSharing: boolean;
-	};
-	console.log(
-		'[share] ChatGPT decision:',
-		result.isWorthSharing,
-		`(using ${model}, ${tokenCount} tokens)`
-	);
-	return result.isWorthSharing;
-}
-
-async function getTweetQuotaRemaining(kv: KVNamespace): Promise<number> {
-	const now = new Date();
-	const key = `tweet_quota:${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}`;
-	const count = await kv.get(key);
-
-	if (!count) {
-		// No tweets today yet
-		await kv.put(key, '0', { expirationTtl: 24 * 60 * 60 });
-		return 15;
-	}
-
-	return 15 - parseInt(count);
-}
-
-async function incrementTweetCount(kv: KVNamespace): Promise<void> {
-	const now = new Date();
-	const key = `tweet_quota:${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}`;
-	const count = await kv.get(key);
-
-	if (!count) {
-		await kv.put(key, '1', { expirationTtl: 24 * 60 * 60 });
-	} else {
-		await kv.put(key, (parseInt(count) + 1).toString(), { expirationTtl: 24 * 60 * 60 });
-	}
-}
-
 async function createThread(
 	messages: Message[],
 	points: number,
@@ -388,23 +308,6 @@ async function createThread(
 	}
 
 	return tweetIds;
-}
-
-async function retweetFromUser(tweetId: string, userId: string, token: string): Promise<void> {
-	const response = await fetch(`https://api.x.com/2/users/${userId}/retweets`, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`,
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({
-			tweet_id: tweetId
-		})
-	});
-
-	if (!response.ok) {
-		console.error('Failed to retweet:', await response.text());
-	}
 }
 
 // Constants for rate limiting
@@ -696,58 +599,11 @@ export const chat = new Hono<Env>()
 			evaluation: string;
 		}>();
 
-		// Check if we have enough tweet quota and if the conversation is worth sharing
-		const remainingTweets = await getTweetQuotaRemaining(c.env.KV);
-		const isWorthSharing = await isConversationWorthSharing(messages, c.env.OPENAI_API_KEY);
+		// Create thread from user's account
+		const tweetIds = await createThread(messages, points, evaluation, session.token.access_token);
+		const tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
 
-		let tweetUrl: string;
-		if (remainingTweets > 0 && isWorthSharing) {
-			// Post as single tweet from Lucy's account
-			const conversation = messages
-				.map((m: Message) => `${m.sender === 'user' ? '👤' : '👩'}: ${m.message}`)
-				.join('\n');
-			const truncatedEvaluation =
-				evaluation.length > 200 ? evaluation.slice(0, 197) + '...' : evaluation;
-			const score = `\n\nScore: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"`;
-
-			const response = await fetch('https://api.x.com/2/tweets', {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${session.token.access_token}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					text: conversation + score
-				})
-			});
-
-			if (!response.ok) {
-				console.error('Failed to create tweet:', await response.text());
-				// Fall back to user thread
-				const tweetIds = await createThread(
-					messages,
-					points,
-					evaluation,
-					session.token.access_token
-				);
-				tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
-
-				await tryRetweet(c, tweetIds[0]);
-			} else {
-				const {
-					data: { id }
-				} = await response.json<{ data: { id: string } }>();
-				await incrementTweetCount(c.env.KV);
-				await retweetFromUser(id, session.user.id, session.token.access_token);
-				tweetUrl = `https://x.com/SimpsForLucy/status/${id}`;
-			}
-		} else {
-			// Create thread from user's account
-			const tweetIds = await createThread(messages, points, evaluation, session.token.access_token);
-			tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
-
-			await tryRetweet(c, tweetIds[0]);
-		}
+		await tryRetweet(c, tweetIds[0]);
 
 		// Claim points
 		const claimResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
