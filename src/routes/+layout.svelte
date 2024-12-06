@@ -70,6 +70,8 @@
 
 		try {
 			const auth: Auth = JSON.parse(authString);
+			console.log('[auth] Loaded session:', auth);
+			$session$ = Promise.resolve(auth);
 
 			// Check if token has expired
 			const now = Date.now();

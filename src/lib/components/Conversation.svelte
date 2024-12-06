@@ -281,6 +281,12 @@
 	$: if (showCooldown) {
 		loadHistory();
 	}
+
+	$: $session$.then((session) => {
+		if (session) {
+			loadHistory();
+		}
+	});
 </script>
 
 <div class="flex md:flex-row flex-col h-full w-full max-w-5xl">
