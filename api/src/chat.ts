@@ -35,8 +35,8 @@ const LucyResponse = z.object({
 });
 
 const EvaluationResponse = z.object({
-	points: z.number().min(1).max(100),
-	evaluation: z.string().max(200)
+	points: z.number(),
+	evaluation: z.string()
 });
 
 // Message types
@@ -73,19 +73,27 @@ type ModelSelection = {
 
 function prepareConversation(
 	messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-	useGpt4 = false,
+	useGpt4o = false,
 	maxTokensForResponse = 1000
 ): ModelSelection {
 	// Start with standard model
-	let model: TiktokenModel = useGpt4 ? 'gpt-4-turbo' : 'gpt-3.5-turbo';
+	let model: TiktokenModel = useGpt4o ? 'gpt-4o-mini' : 'gpt-3.5-turbo';
 	let tokenLimit = 4096;
 
 	// Count tokens for all messages
 	let totalTokens = messages.reduce((sum, msg) => sum + countTokens(msg.content, model), 0);
 
+	if (useGpt4o) {
+		return {
+			model,
+			messages,
+			tokenCount: totalTokens
+		};
+	}
+
 	// If we're close to the 4K limit (leaving room for response), switch to 16K model
 	if (totalTokens + maxTokensForResponse > 3500) {
-		model = useGpt4 ? ('gpt-4-turbo-16k' as TiktokenModel) : ('gpt-3.5-turbo-16k' as TiktokenModel);
+		model = useGpt4o ? ('gpt-4o' as TiktokenModel) : ('gpt-3.5-turbo-16k' as TiktokenModel);
 		tokenLimit = 16384;
 	}
 
@@ -399,6 +407,7 @@ Low scores (1-49) for awkward, creepy, low effort or inappropriate behavior`
 	const completion = await openai.beta.chat.completions.parse({
 		model,
 		messages: preparedMessages,
+		max_tokens: 100,
 		response_format: zodResponseFormat(EvaluationResponse, 'response')
 	});
 
