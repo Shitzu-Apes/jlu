@@ -3,7 +3,6 @@ import type { Env } from 'hono';
 import { Hono } from 'hono';
 import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { OpenAI } from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
 import { requireAuth } from './middleware/auth';
@@ -772,23 +771,32 @@ export const chat = new Hono<Env>()
 		);
 
 		// Get AI response
-		const completion = await openai.beta.chat.completions.parse({
+		const completion = await openai.chat.completions.create({
 			model,
 			messages: truncatedMessages,
-			response_format: zodResponseFormat(LucyResponse, 'response')
+			response_format: { type: 'json_object' }
 		});
 
-		// Parse AI response
-		const lucyResponse = completion.choices[0].message.parsed;
-		if (!lucyResponse) {
-			return c.text('Failed to get response', { status: 500 });
-		}
+		// Parse and validate response
+		const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
+		const parseResult = LucyResponse.safeParse(rawResponse);
 
-		// Convert to Message type
-		const lucyMessage: Message = {
-			sender: 'lucy',
-			...lucyResponse
-		};
+		const lucyResponse = parseResult.success
+			? parseResult.data
+			: ({
+					...rawResponse,
+					mood: 'curious' // Fallback mood if validation fails
+				} as LucyResponse);
+
+		console.log('[chat] Response sent:', lucyResponse, `(using ${model}, ${tokenCount} tokens)`);
+		if (!parseResult.success) {
+			console.warn(
+				'[chat] Invalid mood from OpenAI:',
+				rawResponse.mood,
+				'Validation error:',
+				parseResult.error
+			);
+		}
 
 		// Add both messages to conversation in a single request
 		const finalResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {
@@ -796,11 +804,10 @@ export const chat = new Hono<Env>()
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify([userMessage, lucyMessage])
+			body: JSON.stringify([userMessage, { sender: 'lucy', ...lucyResponse }])
 		});
 
 		// Return the updated conversation with cooldown info
 		const result = await finalResponse.json<FlirtBattleResponse>();
-		console.log('[chat] Response sent:', lucyResponse, `(using ${model}, ${tokenCount} tokens)`);
 		return c.json(result);
 	});
