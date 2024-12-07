@@ -24,6 +24,9 @@ jobs:
       - name: Install step
         run: 'yarn install'
 
+      - name: Add contract connect ID to .env
+        run: echo "VITE_API_URL=https://api.juicylucy.ai" >> .env
+
       - name: Build step
         run: 'yarn build'
 
@@ -32,9 +35,6 @@ jobs:
 
       - name: Svelte Check
         run: 'yarn run check'
-
-      - name: Add contract connect ID to .env
-        run: echo "VITE_API_URL=https://api.juicylucy.ai" >> .env
 
       - name: Upload to Cloudflare Pages
         run: yarn wrangler pages deploy --project-name juicy-lucy .svelte-kit/cloudflare
