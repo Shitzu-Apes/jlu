@@ -229,7 +229,7 @@ async function createThread(
 	// Rest of the conversation
 	let currentTweet = '';
 	for (const message of messages) {
-		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}${message.sender === 'lucy' ? '\n\n@SimpsForLucy' : ''}\n`;
+		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}`;
 
 		// If adding this line would exceed Twitter's limit
 		if (currentTweet.length + line.length > 280) {
