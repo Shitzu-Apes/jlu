@@ -3,6 +3,10 @@ name = "jlu-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-06"
 
+[[routes]]
+pattern = "api.juicylucy.ai"
+custom_domain = true
+
 [observability]
 enabled = true
 

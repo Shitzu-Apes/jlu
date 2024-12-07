@@ -1,0 +1,42 @@
+name: Deploy
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write # Needed for auth with Deno Deploy
+      contents: read # Needed to clone the repository
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install step
+        run: 'yarn install'
+
+      - name: Lint
+        run: 'yarn lint'
+
+      - name: Svelte Check
+        run: 'yarn run check'
+
+      - name: Add contract connect ID to .env
+        run: echo "VITE_API_URL=https://api.juicylucy.ai" >> .env
+
+      - name: Build step
+        run: 'yarn build'
+
+      - name: Upload to Cloudflare Pages
+        run: yarn wrangler pages deploy --project-name juicy-lucy .svelte-kit/cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
