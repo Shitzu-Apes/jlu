@@ -12,7 +12,7 @@ app.use('*', poweredBy());
 app.use(
 	'*',
 	cors({
-		origin: ['http://localhost:5173', 'https://juicylucy.ai'],
+		origin: ['http://localhost:5173', 'https://juicylucy.ai', 'https://juicy-lucy.pages.dev/'],
 		credentials: true
 	})
 );
