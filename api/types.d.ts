@@ -13,6 +13,10 @@ declare module 'hono' {
 			DEV: string;
 			TWITTER_LUCY_USER_ID: string;
 			TWITTER_BEARER_TOKEN: string;
+			NEAR_SECRET_KEY: string;
+			NEAR_ACCOUNT_ID: string;
+			JLU_TOKEN_ID: string;
+			JLU_PER_POINT: string;
 		};
 		Variables: {
 			session: Auth;

@@ -2,6 +2,7 @@
 name = "jlu-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-06"
+compatibility_flags = ["nodejs_compat"]
 
 [[routes]]
 pattern = "api.juicylucy.ai"
@@ -16,6 +17,9 @@ mode = "smart"
 [vars]
 TWITTER_CLIENT_ID = "V1pmZnRIcTJqZnNNbFNILTNnQXI6MTpjaQ"
 TWITTER_LUCY_USER_ID = "1861724864756822016"
+NEAR_ACCOUNT_ID = "juicylucy.near"
+JLU_TOKEN_ID = "jlu-1018.meme-cooking.near"
+JLU_PER_POINT = "30000000000000000000"
 
 [durable_objects]
 bindings = [

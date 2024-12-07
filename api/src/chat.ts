@@ -1,7 +1,11 @@
+import { Action, actionCreators } from '@near-js/transactions';
 import { DurableObject } from 'cloudflare:workers';
 import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
 import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
+import { connect, utils } from 'near-api-js';
+import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
+import type { KeyPairString } from 'near-api-js/lib/utils';
 import { OpenAI } from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
@@ -141,7 +145,6 @@ type FlirtBattleResponse = {
 	messages: Message[];
 	cooldownEnds: number | null;
 	canSendMessage: boolean;
-	error?: string;
 };
 
 // Lucy's prompt
@@ -192,6 +195,7 @@ type Conversation = {
 };
 
 async function createThread(
+	username: string,
 	messages: Message[],
 	points: number,
 	evaluation: string,
@@ -199,13 +203,12 @@ async function createThread(
 ): Promise<string[]> {
 	const tweetIds: string[] = [];
 	console.log('[share] Creating thread');
-	console.log(messages, points, evaluation);
 
 	// First tweet: Score and evaluation
 	const truncatedEvaluation =
 		evaluation.length > 200 ? evaluation.slice(0, 197) + '...' : evaluation;
 	const scoreTweet = {
-		text: `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"\n\n@SimpsForLucy`
+		text: `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"\n\n@SimpsForLucy & @${username}`
 	};
 
 	const scoreResponse = await fetch('https://api.x.com/2/tweets', {
@@ -229,7 +232,7 @@ async function createThread(
 	// Rest of the conversation
 	let currentTweet = '';
 	for (const message of messages) {
-		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}`;
+		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}\n`;
 
 		// If adding this line would exceed Twitter's limit
 		if (currentTweet.length + line.length > 280) {
@@ -314,7 +317,7 @@ async function tryRetweet(c: Context<Env>, tweetId: string): Promise<void> {
 		if (await canRetweet(c.env.KV)) {
 			// Attempt retweet
 			const response = await fetch(
-				`https://api.twitter.com/2/users/${c.env.TWITTER_LUCY_USER_ID}/retweets/${tweetId}`,
+				`https://api.x.com/2/users/${c.env.TWITTER_LUCY_USER_ID}/retweets/${tweetId}`,
 				{
 					method: 'POST',
 					headers: {
@@ -391,6 +394,11 @@ Low scores (1-49) for awkward, creepy, low effort or inappropriate behavior`
 			points: 1,
 			evaluation: 'Not bad, but you can do better!'
 		};
+	}
+	if (result.points < 1) {
+		result.points = 1;
+	} else if (result.points > 100) {
+		result.points = 100;
 	}
 
 	return result;
@@ -568,7 +576,7 @@ export class FlirtBattle extends DurableObject {
 					messages: this.currentConversation.messages,
 					cooldownEnds: newCooldownEnds,
 					canSendMessage: newCanSendMessage
-				});
+				} satisfies FlirtBattleResponse);
 			});
 	}
 
@@ -640,7 +648,13 @@ export const chat = new Hono<Env>()
 		}>();
 
 		// Create thread from user's account
-		const tweetIds = await createThread(messages, points, evaluation, session.token.access_token);
+		const tweetIds = await createThread(
+			session.user.username,
+			messages,
+			points,
+			evaluation,
+			session.token.access_token
+		);
 		const tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
 
 		await tryRetweet(c, tweetIds[0]);
@@ -660,6 +674,8 @@ export const chat = new Hono<Env>()
 		if (!claimResponse.ok) {
 			return c.text('Failed to claim points', { status: claimResponse.status });
 		}
+
+		await sendJLU(walletAddress, points, c);
 
 		const result = await claimResponse.json<FlirtBattleResponse>();
 		return c.json({ ...result, tweetUrl });
@@ -803,3 +819,48 @@ export const chat = new Hono<Env>()
 
 		return chatResponse;
 	});
+
+async function sendJLU(walletAddress: string, points: number, c: Context<Env>) {
+	const networkId = 'mainnet';
+	const nodeUrl = 'https://near.lava.build';
+	const keyPair = utils.KeyPair.fromString(c.env.NEAR_SECRET_KEY as KeyPairString);
+	const keyStore = new InMemoryKeyStore();
+	keyStore.setKey(networkId, c.env.NEAR_ACCOUNT_ID, keyPair);
+
+	const near = await connect({
+		networkId,
+		nodeUrl,
+		keyStore
+	});
+	const account = await near.account(c.env.NEAR_ACCOUNT_ID);
+
+	const actions: Action[] = [];
+	actions.push(
+		actionCreators.functionCall(
+			'storage_deposit',
+			{
+				account_id: walletAddress,
+				registration_only: true
+			},
+			5_000_000_000_000n,
+			1_250_000_000_000_000_000_000n
+		)
+	);
+	const amount = BigInt(points) * BigInt(c.env.JLU_PER_POINT);
+	actions.push(
+		actionCreators.functionCall(
+			'ft_transfer',
+			{
+				receiver_id: walletAddress,
+				amount: amount.toString()
+			},
+			10_000_000_000_000n,
+			1n
+		)
+	);
+
+	await account.signAndSendTransaction({
+		receiverId: c.env.JLU_TOKEN_ID,
+		actions
+	});
+}
