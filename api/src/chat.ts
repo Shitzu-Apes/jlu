@@ -7,7 +7,6 @@ import { connect, utils } from 'near-api-js';
 import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
 import type { KeyPairString } from 'near-api-js/lib/utils';
 import { OpenAI } from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
 import { requireAuth } from './middleware/auth';
@@ -81,23 +80,17 @@ function prepareConversation(
 	maxTokensForResponse = 1000
 ): ModelSelection {
 	// Start with standard model
-	let model: TiktokenModel = useGpt4o ? 'gpt-4o-mini' : 'gpt-3.5-turbo';
+	let model: TiktokenModel = useGpt4o ? 'gpt-4-turbo' : 'gpt-3.5-turbo';
 	let tokenLimit = 4096;
 
 	// Count tokens for all messages
 	let totalTokens = messages.reduce((sum, msg) => sum + countTokens(msg.content, model), 0);
 
-	if (useGpt4o) {
-		return {
-			model,
-			messages,
-			tokenCount: totalTokens
-		};
-	}
-
 	// If we're close to the 4K limit (leaving room for response), switch to 16K model
 	if (totalTokens + maxTokensForResponse > 3500) {
-		model = useGpt4o ? ('gpt-4o' as TiktokenModel) : ('gpt-3.5-turbo-16k' as TiktokenModel);
+		model = useGpt4o
+			? ('gpt-4-turbo-16k' as TiktokenModel)
+			: ('gpt-3.5-turbo-16k' as TiktokenModel);
 		tokenLimit = 16384;
 	}
 
@@ -381,27 +374,29 @@ Low scores (1-49) for awkward, creepy, low effort or inappropriate behavior`
 		100
 	);
 
-	const completion = await openai.beta.chat.completions.parse({
+	const completion = await openai.chat.completions.create({
 		model,
 		messages: preparedMessages,
 		max_tokens: 100,
-		response_format: zodResponseFormat(EvaluationResponse, 'response')
+		response_format: { type: 'json_object' }
 	});
 
-	const result = completion.choices[0].message.parsed;
-	if (!result) {
+	const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
+	const parseResult = EvaluationResponse.safeParse(rawResponse);
+
+	if (!parseResult.success) {
 		return {
 			points: 1,
 			evaluation: 'Not bad, but you can do better!'
 		};
 	}
-	if (result.points < 1) {
-		result.points = 1;
-	} else if (result.points > 100) {
-		result.points = 100;
+	if (parseResult.data.points < 1) {
+		parseResult.data.points = 1;
+	} else if (parseResult.data.points > 100) {
+		parseResult.data.points = 100;
 	}
 
-	return result;
+	return parseResult.data;
 }
 
 export class FlirtBattle extends DurableObject {
