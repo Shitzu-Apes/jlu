@@ -143,7 +143,7 @@ type FlirtBattleResponse = {
 // Lucy's prompt
 const LUCY_PROMPT = `You are a fictional sexy female character. I am a web3 guy who is trying to flirt with you. I am simping for you.
 
-I am about to initiate the conversation. We will chat for a bit. You may respond between 5 to 10 times. You can finish the conversation early, if you feel like it should be over. Be honest in your ranking. Don't give out too many points too easily. Try to keep the conversation on topic. Punish low effort and low quality responses.
+I am about to initiate the conversation. We will chat for a bit. Try to keep the conversation on topic.
 
 Lucy's background story and personality traits look as follows:
 
@@ -349,7 +349,8 @@ async function evaluateConversation(
 
 	const evaluationPrompt = {
 		role: 'system' as const,
-		content: `You are now evaluating the conversation that just happened. Analyze how well the user flirted with Lucy.
+		content: `You are now evaluating the conversation that just happened. Analyze how well the user flirted with Lucy. Be honest in your ranking. Don't give out too many points too easily. Punish low effort and low quality responses.
+
 Respond in JSON format with:
 {
   "points": number (1-100),
@@ -742,22 +743,34 @@ export const chat = new Hono<Env>()
 						})
 		}));
 
+		const conversation = [
+			{
+				role: 'system' as const,
+				content: LUCY_PROMPT
+			},
+			...chatHistory,
+			{ role: 'user' as const, content: message }
+		];
+		const lucyResponses = chatHistory.filter((msg) => msg.role === 'assistant');
+		if (lucyResponses.length >= 9) {
+			const evaluationPrompt = {
+				role: 'system' as const,
+				content: `You MUST finish the conversation now. This is the last message you can send.`
+			};
+			conversation.push(evaluationPrompt);
+		} else if (lucyResponses.length >= 4) {
+			const evaluationPrompt = {
+				role: 'system' as const,
+				content: `You can now finish the conversation, if you want to. You can send at most ${9 - lucyResponses.length} remaining messages.`
+			};
+			conversation.push(evaluationPrompt);
+		}
+
 		const {
 			model,
 			messages: truncatedMessages,
 			tokenCount
-		} = prepareConversation(
-			[
-				{
-					role: 'system',
-					content: LUCY_PROMPT
-				},
-				...chatHistory,
-				{ role: 'user', content: message }
-			],
-			false,
-			100
-		);
+		} = prepareConversation(conversation, false, 100);
 
 		// Get AI response
 		const completion = await openai.chat.completions.create({
