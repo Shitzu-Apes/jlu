@@ -2,7 +2,7 @@
 	import { createPopover } from '@melt-ui/svelte';
 	import { melt } from '@melt-ui/svelte';
 	import dayjs from 'dayjs';
-	import { onDestroy, tick } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { writable } from 'svelte/store';
 
 	import ClaimPoints from './ClaimPoints.svelte';
@@ -298,7 +298,7 @@
 </script>
 
 <div class="flex md:flex-row flex-col h-full w-full max-w-5xl">
-	<div class="md:flex hidden flex-col items-center md:w-64 py-4 px-2 flex-shrink-0">
+	<div class="md:flex hidden flex-col items-center md:w-64 py-4 px-2 flex-shrink-0 z-20">
 		<Mood
 			mood={$focusedMessage$?.mood ?? lastLucyMessage?.mood ?? defaultMood}
 			size="md"
@@ -317,7 +317,7 @@
 			{:then loggedIn}
 				{#if !loggedIn}
 					<div
-						class="absolute inset-0 flex items-end md:items-center justify-center bg-purple-950/30 backdrop-blur-sm"
+						class="absolute inset-0 flex items-end md:items-center justify-center bg-purple-950/30 backdrop-blur-sm z-10"
 					>
 						<div class="flex flex-col items-center gap-4 p-4 w-full md:w-auto">
 							<div
@@ -331,7 +331,7 @@
 
 							<button
 								on:click={handleOpenHowItWorks}
-								class="w-full max-w-md flex flex-col items-center gap-4 px-8 py-6 bg-purple-900/90 hover:bg-purple-900/80 rounded-xl transition-colors group"
+								class="w-full max-w-md flex-col items-center gap-4 px-8 py-6 bg-purple-900/90 hover:bg-purple-900/80 rounded-xl transition-colors hidden md:flex"
 							>
 								<div
 									class="i-mdi:lightbulb text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
@@ -349,7 +349,7 @@
 			{/await}
 
 			<!-- Mobile mood display -->
-			<div class="md:hidden flex flex-col items-center py-4 flex-shrink-0">
+			<div class="md:hidden flex flex-col items-center py-4 flex-shrink-0 z-20">
 				<Mood
 					mood={$focusedMessage$?.mood ?? lastLucyMessage?.mood ?? defaultMood}
 					size="md"
