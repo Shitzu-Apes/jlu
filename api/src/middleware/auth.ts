@@ -39,6 +39,11 @@ export const requireAuth: MiddlewareHandler = async (c: Context, next) => {
 		return c.text('Session expired', 401);
 	}
 
+	// Check if token expiration is invalid (X session expiration is 2 hours)
+	if (auth.expires_at > Date.now() + 1_000 * 60 * 60 * 2) {
+		return c.text('Session expired', 401);
+	}
+
 	// Check if user ID matches
 	if (auth.user.id !== userId) {
 		return c.text('Invalid user ID', 401);

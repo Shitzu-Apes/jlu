@@ -115,8 +115,8 @@ auth.get('/login/refresh', async (c) => {
 			return res;
 		}
 
-		const { token, user } = res;
-		return c.json({ token, user });
+		const { token, user, expires_at } = res;
+		return c.json({ token, user, expires_at });
 	} catch (err) {
 		console.error('[refresh] OAuth error:', err);
 		return c.text('Authentication failed', { status: 400 });
@@ -170,11 +170,12 @@ auth.get('/login', async (c) => {
 		if (res instanceof Response) {
 			return res;
 		}
-		const { token, user } = res;
+		const { token, user, expires_at } = res;
 		console.log('[login] Successfully logged in user:', user.id);
 		return c.json({
 			token,
-			user
+			user,
+			expires_at
 		});
 	} catch (err) {
 		console.error('[login] OAuth error:', err);
@@ -281,17 +282,19 @@ async function handleTokenResponse(c: Context<Env>, tokenResponse: Response) {
 
 	const id = c.env.SESSION.idFromName(user.id);
 	const session = c.env.SESSION.get(id);
+	const expires_at = Date.now() + token.expires_in * 1_000;
 	await session.fetch(new URL(c.req.url).origin, {
 		method: 'PUT',
 		body: JSON.stringify({
-			expires_at: Date.now() + token.expires_in * 60 * 1_000,
 			token,
-			user
+			user,
+			expires_at
 		} satisfies Auth)
 	});
 
 	return {
 		token,
-		user
+		user,
+		expires_at
 	};
 }

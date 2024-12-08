@@ -64,7 +64,12 @@
 	onMount(() => {
 		const authString = localStorage.getItem('auth');
 		if (!authString) {
-			$session$ = Promise.resolve(undefined);
+			const url = new URL(window.location.href);
+			const state = url.searchParams.get('state');
+			const code = url.searchParams.get('code');
+			if (!state && !code) {
+				$session$ = Promise.resolve(undefined);
+			}
 			return;
 		}
 
@@ -75,7 +80,12 @@
 
 			// Check if token has expired
 			const now = Date.now();
-			if (!auth?.token?.access_token || !auth?.user?.id || auth.expires_at < now) {
+			if (
+				!auth?.token?.access_token ||
+				!auth?.user?.id ||
+				!auth.expires_at ||
+				auth.expires_at < now
+			) {
 				console.log('[auth] Invalid or expired session, clearing');
 				localStorage.removeItem('auth');
 				$session$ = Promise.resolve(undefined);
