@@ -752,16 +752,16 @@ export const chat = new Hono<Env>()
 			{ role: 'user' as const, content: message }
 		];
 		const lucyResponses = chatHistory.filter((msg) => msg.role === 'assistant');
-		if (lucyResponses.length >= 9) {
+		if (lucyResponses.length >= 13) {
 			const evaluationPrompt = {
 				role: 'system' as const,
 				content: `You MUST finish the conversation now. This is the last message you can send.`
 			};
 			conversation.push(evaluationPrompt);
-		} else if (lucyResponses.length >= 4) {
+		} else if (lucyResponses.length >= 6) {
 			const evaluationPrompt = {
 				role: 'system' as const,
-				content: `You can now finish the conversation, if you want to. You can send at most ${9 - lucyResponses.length} remaining messages.`
+				content: `You can now finish the conversation if you want to, but don't be rude. Maybe your chat partner got something else he wants to talk about. You can send at most ${13 - lucyResponses.length} remaining messages.`
 			};
 			conversation.push(evaluationPrompt);
 		}
