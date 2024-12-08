@@ -199,9 +199,9 @@ async function createThread(
 
 	// First tweet: Score and evaluation
 	const truncatedEvaluation =
-		evaluation.length > 200 ? evaluation.slice(0, 197) + '...' : evaluation;
+		evaluation.length > 195 ? evaluation.slice(0, 192) + '...' : evaluation;
 	const scoreTweet = {
-		text: `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"\n\n@SimpsForLucy & @${username}`
+		text: `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"\n\n@SimpsForLucy & @${username}\n#Simp2Earn`
 	};
 
 	const scoreResponse = await fetch('https://api.x.com/2/tweets', {
