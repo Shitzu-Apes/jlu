@@ -2,7 +2,7 @@
 	import { createPopover } from '@melt-ui/svelte';
 	import { melt } from '@melt-ui/svelte';
 	import dayjs from 'dayjs';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, tick } from 'svelte';
 	import { writable } from 'svelte/store';
 
 	import ClaimPoints from './ClaimPoints.svelte';
@@ -238,6 +238,9 @@
 			conversation = data.messages;
 			cooldownEnds = data.cooldownEnds;
 			canSendMessage = data.canSendMessage;
+			setTimeout(() => {
+				inputRef.focus();
+			}, 0);
 		} catch (err) {
 			console.error('Error sending message:', err);
 		} finally {
