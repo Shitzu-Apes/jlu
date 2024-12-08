@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 
 import { session$ } from './auth';
+import { showToast } from './components/Toast.svelte';
 
 export async function fetchApi(
 	path: string,
@@ -28,6 +29,7 @@ export async function fetchApi(
 		console.log('[api] Session expired, clearing auth');
 		localStorage.removeItem('auth');
 		session$.set(Promise.resolve(undefined));
+		showToast('Session expired. Please login again.');
 		throw new Error('Session expired');
 	}
 

@@ -192,8 +192,9 @@ async function createThread(
 	messages: Message[],
 	points: number,
 	evaluation: string,
-	token: string
-): Promise<string[]> {
+	token: string,
+	c: Context<Env>
+): Promise<string[] | Response> {
 	const tweetIds: string[] = [];
 	console.log('[share] Creating thread');
 
@@ -214,6 +215,9 @@ async function createThread(
 	});
 
 	if (!scoreResponse.ok) {
+		if (scoreResponse.status === 401) {
+			return c.json({ error: 'Session expired. Please login again.' }, 401);
+		}
 		throw new Error(`Failed to create score tweet: ${await scoreResponse.text()}`);
 	}
 
@@ -649,8 +653,12 @@ export const chat = new Hono<Env>()
 			messages,
 			points,
 			evaluation,
-			session.token.access_token
+			session.token.access_token,
+			c
 		);
+		if (tweetIds instanceof Response) {
+			return tweetIds;
+		}
 		const tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
 
 		await tryRetweet(c, tweetIds[0]);
