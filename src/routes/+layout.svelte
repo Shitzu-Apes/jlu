@@ -25,9 +25,7 @@
 
 			const state = url.searchParams.get('state');
 			const code = url.searchParams.get('code');
-			const nonce = sessionStorage.getItem('nonce');
-			if (!state || !code || !nonce) return;
-			if (state !== nonce) return;
+			if (!state || !code) return;
 
 			// Clean up URL params
 			url.searchParams.delete('state');
@@ -35,7 +33,7 @@
 			goto(url.href, { replaceState: true, noScroll: true });
 
 			fetch(
-				`${import.meta.env.VITE_API_URL}/auth/login?code=${code}&nonce=${nonce}&redirect_url=${window.location.origin}`
+				`${import.meta.env.VITE_API_URL}/auth/login?code=${code}&nonce=${state}&redirect_url=${window.location.origin}`
 			)
 				.then(async (res) => {
 					if (!res.ok) {
