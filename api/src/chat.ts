@@ -80,17 +80,24 @@ function prepareConversation(
 	maxTokensForResponse = 1000
 ): ModelSelection {
 	// Start with standard model
-	let model: TiktokenModel = useGpt4o ? 'gpt-4-turbo' : 'gpt-3.5-turbo';
+	let model: TiktokenModel = useGpt4o ? 'gpt-4o-mini' : 'gpt-3.5-turbo';
+
 	let tokenLimit = 4096;
 
 	// Count tokens for all messages
 	let totalTokens = messages.reduce((sum, msg) => sum + countTokens(msg.content, model), 0);
 
+	if (useGpt4o) {
+		return {
+			model: 'gpt-4o-mini',
+			messages,
+			tokenCount: totalTokens
+		};
+	}
+
 	// If we're close to the 4K limit (leaving room for response), switch to 16K model
 	if (totalTokens + maxTokensForResponse > 3500) {
-		model = useGpt4o
-			? ('gpt-4-turbo-16k' as TiktokenModel)
-			: ('gpt-3.5-turbo-16k' as TiktokenModel);
+		model = 'gpt-3.5-turbo-16k' as TiktokenModel;
 		tokenLimit = 16384;
 	}
 
