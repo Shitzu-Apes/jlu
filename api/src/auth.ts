@@ -210,7 +210,7 @@ async function handleTwitterResponse(
 	}
 }
 
-async function handleTokenResponse(c: Context<Env>, tokenResponse: Response) {
+export async function handleTokenResponse(c: Context<Env>, tokenResponse: Response) {
 	const tokenError = await handleTwitterResponse(tokenResponse, 'token');
 	if (tokenError) return tokenError;
 

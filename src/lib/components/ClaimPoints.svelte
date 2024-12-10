@@ -20,15 +20,7 @@
 				method: 'POST',
 				body: { walletAddress }
 			});
-
 			if (!response.ok) {
-				if (response.status === 401) {
-					showToast('Session expired. Please login again.');
-					closeBottomSheet();
-					return;
-				}
-				const error = await response.text();
-				console.error('Failed to claim points:', error);
 				showToast('Failed to claim points. Please try again later.');
 				return;
 			}
@@ -36,8 +28,8 @@
 			const { tweetUrl } = await response.json<{ tweetUrl: string }>();
 			showToast('Points claimed successfully! Check your wallet soon.', 'success');
 			onClaim();
-			closeBottomSheet();
 			window.open(tweetUrl, '_blank');
+			closeBottomSheet();
 		} catch (err) {
 			console.error('Error claiming points:', err);
 			showToast('Failed to claim points. Please try again later.');

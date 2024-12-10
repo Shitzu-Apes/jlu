@@ -9,7 +9,9 @@ import type { KeyPairString } from 'near-api-js/lib/utils';
 import { OpenAI } from 'openai';
 import { z } from 'zod';
 
+import type { Auth } from './auth';
 import { requireAuth } from './middleware/auth';
+import { getLucySession } from './session';
 
 // Response schemas
 const LucyMood = z.enum([
@@ -194,154 +196,73 @@ type Conversation = {
 	evaluation?: string;
 };
 
-async function createThread(
+async function sendTweet(
 	username: string,
 	messages: Message[],
 	points: number,
 	evaluation: string,
-	token: string,
+	lucySession: Auth,
 	c: Context<Env>
-): Promise<string[] | Response> {
-	const tweetIds: string[] = [];
-	console.log('[share] Creating thread');
+): Promise<string | Response> {
+	console.log('[share] Creating tweet');
 
-	// First tweet: Score and evaluation
-	const truncatedEvaluation =
-		evaluation.length > 195 ? evaluation.slice(0, 192) + '...' : evaluation;
-	const scoreTweet = {
-		text: `Score: ${points}/100\nLucy's Evaluation: "${truncatedEvaluation}"\n\n@SimpsForLucy & @${username}\n#Simp2Earn`
-	};
+	try {
+		let text = `Score: ${points}/100\nLucy's Evaluation: "${evaluation}"\n\n@SimpsForLucy & @${username}\n#Simp2Earn\n\n`;
 
-	const scoreResponse = await fetch('https://api.x.com/2/tweets', {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`,
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(scoreTweet)
-	});
+		for (const message of messages) {
+			const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}\n`;
 
-	if (!scoreResponse.ok) {
-		if (scoreResponse.status === 401) {
-			return c.json({ error: 'Session expired. Please login again.' }, 401);
-		}
-		throw new Error(`Failed to create score tweet: ${await scoreResponse.text()}`);
-	}
-
-	const {
-		data: { id: scoreId }
-	} = await scoreResponse.json<{ data: { id: string } }>();
-	tweetIds.push(scoreId);
-
-	// Rest of the conversation
-	let currentTweet = '';
-	for (const message of messages) {
-		const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}\n`;
-
-		// If adding this line would exceed Twitter's limit
-		if (currentTweet.length + line.length > 280) {
-			// Post current tweet
-			const response = await fetch('https://api.x.com/2/tweets', {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					text: currentTweet,
-					reply: {
-						in_reply_to_tweet_id: tweetIds[tweetIds.length - 1]
-					}
-				})
-			});
-
-			if (!response.ok) {
-				throw new Error(`Failed to create tweet: ${await response.text()}`);
+			if (text.length + line.length > 4_000) {
+				break;
 			}
 
-			const {
-				data: { id }
-			} = await response.json<{ data: { id: string } }>();
-			tweetIds.push(id);
-			currentTweet = line;
-		} else {
-			currentTweet += line;
+			text += line;
 		}
-	}
 
-	// Post final tweet if there's anything left
-	if (currentTweet) {
 		const response = await fetch('https://api.x.com/2/tweets', {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${token}`,
+				Authorization: `Bearer ${lucySession.token.access_token}`,
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				text: currentTweet,
-				reply: {
-					in_reply_to_tweet_id: tweetIds[tweetIds.length - 1]
-				}
+				text
 			})
 		});
 
 		if (!response.ok) {
-			throw new Error(`Failed to create tweet: ${await response.text()}`);
+			return c.json({ error: `Failed to create tweet: ${await response.text()}` }, 500);
 		}
 
 		const {
 			data: { id }
 		} = await response.json<{ data: { id: string } }>();
-		tweetIds.push(id);
+
+		return id;
+	} catch (err) {
+		console.error('[share] Failed to create tweet', err);
+		return c.json({ error: 'Failed to create tweet' }, 500);
 	}
-
-	return tweetIds;
 }
 
-// Constants for rate limiting
-const RETWEET_COOLDOWN_KEY = 'retweet-cooldown';
-const RETWEET_COOLDOWN_MINS = 15;
-
-// Helper functions
-async function canRetweet(kv: KVNamespace): Promise<boolean> {
-	const now = Date.now();
-	const lastRetweetStr = (await kv.get(RETWEET_COOLDOWN_KEY, { type: 'text' })) || '0';
-	const lastRetweet = parseInt(lastRetweetStr, 10);
-	return now - lastRetweet >= RETWEET_COOLDOWN_MINS * 60 * 1000;
-}
-
-async function updateRetweetCooldown(kv: KVNamespace): Promise<void> {
-	await kv.put(RETWEET_COOLDOWN_KEY, Date.now().toString(), {
-		expirationTtl: RETWEET_COOLDOWN_MINS * 60
+async function retweet(auth: Auth, tweetId: string, c: Context<Env>): Promise<void | Response> {
+	const response = await fetch(`https://api.x.com/2/users/${auth.user.id}/retweets`, {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${auth.token.access_token}`,
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({
+			tweet_id: tweetId
+		})
 	});
-}
 
-async function tryRetweet(c: Context<Env>, tweetId: string): Promise<void> {
-	try {
-		if (await canRetweet(c.env.KV)) {
-			// Attempt retweet
-			const response = await fetch(
-				`https://api.x.com/2/users/${c.env.TWITTER_LUCY_USER_ID}/retweets/${tweetId}`,
-				{
-					method: 'POST',
-					headers: {
-						Authorization: `Bearer ${c.env.TWITTER_BEARER_TOKEN}`,
-						'Content-Type': 'application/json'
-					}
-				}
-			);
-
-			if (response.ok) {
-				await updateRetweetCooldown(c.env.KV);
-				console.log('[retweet] Successfully retweeted:', tweetId);
-			} else {
-				console.warn('[retweet] Failed to retweet:', tweetId, await response.text());
-			}
-		} else {
-			console.log('[retweet] Skipping retweet due to rate limit:', tweetId);
-		}
-	} catch (error) {
-		console.error('[retweet] Error retweeting:', error);
+	if (response.ok) {
+		console.log('[retweet] Successfully retweeted:', tweetId);
+	} else {
+		const text = await response.text();
+		console.warn('[retweet] Failed to retweet:', tweetId, text);
+		return c.json({ error: `Failed to retweet: ${text}` }, 500);
 	}
 }
 
@@ -639,6 +560,11 @@ export const chat = new Hono<Env>()
 		const { walletAddress } = await c.req.json<{ walletAddress: string }>();
 		const session = c.get('session');
 
+		const lucySession = await getLucySession(c);
+		if (lucySession instanceof Response) {
+			return lucySession;
+		}
+
 		// Get or create FlirtBattle DO for this user
 		const flirtBattleDO = c.env.FLIRTBATTLE.get(c.env.FLIRTBATTLE.idFromName(session.user.id));
 
@@ -655,20 +581,23 @@ export const chat = new Hono<Env>()
 		}>();
 
 		// Create thread from user's account
-		const tweetIds = await createThread(
+		const tweetId = await sendTweet(
 			session.user.username,
 			messages,
 			points,
 			evaluation,
-			session.token.access_token,
+			lucySession,
 			c
 		);
-		if (tweetIds instanceof Response) {
-			return tweetIds;
+		if (tweetId instanceof Response) {
+			return tweetId;
 		}
-		const tweetUrl = `https://x.com/${session.user.username}/status/${tweetIds[0]}`;
+		const tweetUrl = `https://x.com/SimpsForLucy/status/${tweetId}`;
 
-		await tryRetweet(c, tweetIds[0]);
+		const rt = await retweet(session, tweetId, c);
+		if (rt instanceof Response) {
+			return rt;
+		}
 
 		// Claim points
 		const claimResponse = await flirtBattleDO.fetch(new URL(c.req.url).origin, {

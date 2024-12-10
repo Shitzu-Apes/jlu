@@ -1,8 +1,47 @@
 import { DurableObject } from 'cloudflare:workers';
-import type { Env } from 'hono';
+import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
 
-import type { Auth } from './auth';
+import { handleTokenResponse, type Auth } from './auth';
+
+export async function getLucySession(c: Context<Env>): Promise<Auth | Response> {
+	const sessionDO = c.env.SESSION.get(c.env.SESSION.idFromName(c.env.TWITTER_LUCY_USER_ID));
+	const response = await sessionDO.fetch(new URL(c.req.url).origin);
+
+	if (!response.ok) {
+		return c.text('Lucy session not found', 500);
+	}
+
+	let auth = (await response.json()) as Auth;
+
+	// Check if token is expired
+	if (Date.now() + 60_000 >= auth.expires_at) {
+		const basicAuth = btoa(`${c.env.TWITTER_CLIENT_ID}:${c.env.TWITTER_CLIENT_SECRET}`);
+
+		console.log('[refresh] Attempting token refresh for Lucy');
+		const tokenResponse = await fetch('https://api.x.com/2/oauth2/token', {
+			method: 'POST',
+			headers: {
+				Authorization: `Basic ${basicAuth}`,
+				'Content-Type': 'application/x-www-form-urlencoded'
+			},
+			body: new URLSearchParams({
+				client_id: c.env.TWITTER_CLIENT_ID,
+				grant_type: 'refresh_token',
+				refresh_token: auth.token.refresh_token
+			})
+		});
+
+		const res = await handleTokenResponse(c, tokenResponse);
+		if (res instanceof Response) {
+			return res;
+		}
+
+		auth = res;
+	}
+
+	return auth;
+}
 
 export class Session extends DurableObject {
 	private storage: DurableObjectStorage;
