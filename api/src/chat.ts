@@ -200,7 +200,7 @@ async function sendTweet(
 		let text = `Score: ${points}/100\nLucy's Evaluation: "${evaluation}"\n\n@SimpsForLucy & @${username}\n#Simp2Earn\n\n`;
 
 		for (const message of messages) {
-			const line = `${message.sender === 'user' ? '👤' : '👩'}: ${message.message}\n`;
+			const line = `${message.sender === 'user' ? '👤' : '👩'}${message.sender === 'lucy' ? ` *${message.mood}*` : ''}: ${message.message}\n`;
 
 			if (text.length + line.length > 4_000) {
 				break;
