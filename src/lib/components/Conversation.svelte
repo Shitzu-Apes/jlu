@@ -353,7 +353,7 @@
 				<Mood
 					mood={$focusedMessage$?.mood ?? lastLucyMessage?.mood ?? defaultMood}
 					size="md"
-					className="w-32 h-52"
+					className="w-28 h-46"
 				/>
 			</div>
 

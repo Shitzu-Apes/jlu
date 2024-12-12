@@ -72,6 +72,13 @@ export class Session extends DurableObject {
 
 				await this.storage.put('auth', this.auth);
 				return c.text('', { status: 204 });
+			})
+			.delete('*', async (c) => {
+				// Clear both the in-memory and stored auth
+				this.auth = undefined;
+				await this.storage.delete('auth');
+				console.log('[auth] Session cleared');
+				return c.text('', { status: 204 });
 			});
 	}
 

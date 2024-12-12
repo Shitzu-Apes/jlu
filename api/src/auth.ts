@@ -183,6 +183,27 @@ auth.get('/login', async (c) => {
 	}
 });
 
+auth.post('/logout', async (c) => {
+	const userId = c.req.header('X-User-Id');
+	if (!userId) {
+		return c.text('No user ID provided', { status: 400 });
+	}
+
+	try {
+		// Clear the user's session
+		const id = c.env.SESSION.idFromName(userId);
+		const session = c.env.SESSION.get(id);
+		await session.fetch(new URL(c.req.url).origin, {
+			method: 'DELETE'
+		});
+
+		return c.text('', 204);
+	} catch (error) {
+		console.error('[logout] Error clearing session:', error);
+		return c.text('Failed to logout', 500);
+	}
+});
+
 async function handleTwitterResponse(
 	response: Response,
 	context: string
