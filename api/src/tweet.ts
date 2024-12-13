@@ -9,18 +9,30 @@ import type { EnvBindings } from '../types';
 
 import { twitterRequest } from './oauth1';
 
-export const tweet = new Hono<Env>().get('/current', async (c) => {
-	const tweets = c.env.TWEETS.idFromName('tweets');
-	const tweetsDo = c.env.TWEETS.get(tweets);
+export const tweet = new Hono<Env>()
+	.get('/current', async (c) => {
+		const tweets = c.env.TWEETS.idFromName('tweets');
+		const tweetsDo = c.env.TWEETS.get(tweets);
 
-	const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/current'));
-	if (!response.ok) {
-		return c.text('', { status: response.status });
-	}
+		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/current'));
+		if (!response.ok) {
+			return c.text('', { status: response.status });
+		}
 
-	const result = await response.json<Tweet>();
-	return c.json(result);
-});
+		const result = await response.json<Tweet>();
+		return c.json(result);
+	})
+	.delete('/current', async (c) => {
+		if (c.req.header('Authorization') !== `Bearer ${c.env.TWITTER_BEARER_TOKEN}`) {
+			return c.text('Unauthorized', { status: 401 });
+		}
+
+		const tweets = c.env.TWEETS.idFromName('tweets');
+		const tweetsDo = c.env.TWEETS.get(tweets);
+
+		await tweetsDo.fetch(new Request('https://api.juicylucy.ai/current', { method: 'DELETE' }));
+		return c.text('', { status: 204 });
+	});
 
 export async function scheduleTweet(env: EnvBindings, ctx: ExecutionContext) {
 	const tweets = env.TWEETS.idFromName('tweets');
@@ -92,6 +104,7 @@ Write about your next Tweet. Give me a JSON response including:
 - outfit: a reasonable outfit for the scene from the list of outfits.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 - temperature: a reasonable temperature for the scene from the list of temperatures.
+- local_time: the local time of day at your location.
 - cooldown: calculate the appropriate cooldown in seconds to reflect the local time of day at your location (e.g., morning, afternoon, evening, or night) and ensure you post 2-5 tweets per day. If traveling to the next location, include travel time in the cooldown. Include sleeping schedule in the cooldown.`;
 
 const Outfit = z.enum([
@@ -171,6 +184,7 @@ const ScheduledTweetSchema = z.object({
 	outfit: Outfit,
 	hairstyle: Hairstyle,
 	temperature: Temperature,
+	local_time: z.string(),
 	cooldown: z.number()
 });
 export type ScheduledTweet = z.infer<typeof ScheduledTweetSchema>;
@@ -278,7 +292,7 @@ export class Tweets extends DurableObject {
 					messages.push({ role: 'assistant', content: JSON.stringify(gpt4oResponse) });
 					messages.push({
 						role: 'system',
-						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. The current UTC time is ${new Date().toISOString()}. Your location is ${gpt4oResponse.location.city}, ${gpt4oResponse.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
+						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. The current actual UTC time is ${new Date().toISOString()}. You think your local time is ${gpt4oResponse.local_time}. Your location is ${gpt4oResponse.location.city}, ${gpt4oResponse.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
 					});
 					gpt4ores = await openai.beta.chat.completions.parse({
 						model: 'gpt-4o',
@@ -499,6 +513,15 @@ export class Tweets extends DurableObject {
 				}
 
 				return c.json(this.currentTweet);
+			})
+			.delete('/current', async () => {
+				this.currentTweet = undefined;
+				await this.state.storage.delete('currentTweet');
+				this.nextTweetTimestamp = undefined;
+				await this.state.storage.delete('nextTweetTimestamp');
+				this.nextLocation = undefined;
+				await this.state.storage.delete('nextLocation');
+				return new Response(null, { status: 204 });
 			});
 	}
 
