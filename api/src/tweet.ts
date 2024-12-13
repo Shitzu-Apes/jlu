@@ -400,8 +400,8 @@ export class Tweets extends DurableObject {
 				const imageBuffer = await imageResponse.arrayBuffer();
 
 				// Upload media to Twitter
-				const formData = new FormData();
-				formData.append('media', new Blob([imageBuffer]));
+				const formData = new URLSearchParams();
+				formData.append('media_data', Buffer.from(imageBuffer).toString('base64'));
 
 				const uploadResponse = await twitterRequest(
 					'POST',
@@ -414,7 +414,7 @@ export class Tweets extends DurableObject {
 						accessSecret: this.env.TWITTER_ACCESS_SECRET
 					},
 					formData,
-					true // isMultipart flag
+					true
 				);
 
 				if (!uploadResponse.ok) {

@@ -1,44 +1,8 @@
-import { createHmac, randomBytes } from 'crypto';
+import { createHmac } from 'crypto';
+import OAuth from 'oauth-1.0a';
 
-export function generateNonce(): string {
-	return randomBytes(32)
-		.toString('base64')
-		.replace(/[^a-zA-Z0-9]/g, '');
-}
-
-export function generateTimestamp(): string {
-	return Math.floor(Date.now() / 1000).toString();
-}
-
-export function encodeParameter(str: string): string {
-	return encodeURIComponent(str)
-		.replace(/!/g, '%21')
-		.replace(/\*/g, '%2A')
-		.replace(/'/g, '%27')
-		.replace(/\(/g, '%28')
-		.replace(/\)/g, '%29');
-}
-
-export function createSignature(
-	method: string,
-	url: string,
-	parameters: Record<string, string>,
-	consumerSecret: string,
-	tokenSecret: string
-): string {
-	const parameterString = Object.keys(parameters)
-		.sort()
-		.map((key) => `${encodeParameter(key)}=${encodeParameter(parameters[key])}`)
-		.join('&');
-
-	const signatureBaseString = [
-		method.toUpperCase(),
-		encodeParameter(url),
-		encodeParameter(parameterString)
-	].join('&');
-
-	const signingKey = `${encodeParameter(consumerSecret)}&${encodeParameter(tokenSecret)}`;
-	return createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
+function hash_function_sha1(base_string: string, key: string) {
+	return createHmac('sha1', key).update(base_string).digest('base64');
 }
 
 export async function twitterRequest(
@@ -51,44 +15,48 @@ export async function twitterRequest(
 		accessToken: string;
 		accessSecret: string;
 	},
-	body?: BodyInit | FormData,
-	isMultipart: boolean = false
+	body?: BodyInit | URLSearchParams,
+	isFormUrlEncoded: boolean = false
 ): Promise<Response> {
-	const oauthParams = {
-		oauth_consumer_key: credentials.apiKey,
-		oauth_nonce: generateNonce(),
-		oauth_signature_method: 'HMAC-SHA1',
-		oauth_timestamp: generateTimestamp(),
-		oauth_token: credentials.accessToken,
-		oauth_version: '1.0',
-		...params
+	const oauth = new OAuth({
+		consumer: {
+			key: credentials.apiKey,
+			secret: credentials.apiSecret
+		},
+		signature_method: 'HMAC-SHA1',
+		hash_function: hash_function_sha1
+	});
+
+	const formData: Record<string, string> = {};
+	if (isFormUrlEncoded && body instanceof URLSearchParams) {
+		for (const [key, value] of body.entries()) {
+			formData[key] = value;
+		}
+	}
+
+	const requestData = {
+		url,
+		method,
+		data: {
+			...params,
+			...formData
+		}
 	};
 
-	const signature = createSignature(
-		method,
-		url,
-		oauthParams,
-		credentials.apiSecret,
-		credentials.accessSecret
-	);
-
-	const oauthHeader =
-		'OAuth ' +
-		Object.entries({
-			...oauthParams,
-			oauth_signature: signature
-		})
-			.map(([key, value]) => `${encodeParameter(key)}="${encodeParameter(value)}"`)
-			.join(', ');
+	const token = {
+		key: credentials.accessToken,
+		secret: credentials.accessSecret
+	};
 
 	const headers: Record<string, string> = {
-		Authorization: oauthHeader
+		...oauth.toHeader(oauth.authorize(requestData, token))
 	};
 
-	if (!isMultipart) {
+	if (!isFormUrlEncoded) {
 		headers['Content-Type'] = 'application/json';
+	} else {
+		headers['Content-Type'] = 'application/x-www-form-urlencoded';
 	}
-	console.log(url, method, headers, body);
 
 	return fetch(url, {
 		method,
