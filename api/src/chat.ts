@@ -307,10 +307,10 @@ Low scores (1-49) for awkward, creepy, low effort or inappropriate behavior`
 		100
 	);
 
-	const response = await fetch(`${c.env.OPENAI_API_URL}/v1/chat/completions`, {
+	const response = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
 		method: 'POST',
 		headers: {
-			Authorization: `Bearer ${c.env.OPENAI_API_KEY}`,
+			Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
 			'Content-Type': 'application/json',
 			'User-Agent': 'SimpsForLucy'
 		},
@@ -731,10 +731,10 @@ export const chat = new Hono<Env>()
 		const { model, messages: truncatedMessages } = prepareConversation(conversation, 100);
 
 		// Get AI response
-		const res = await fetch(`${c.env.OPENAI_API_URL}/v1/chat/completions`, {
+		const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${c.env.OPENAI_API_KEY}`,
+				Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
 				'Content-Type': 'application/json',
 				'User-Agent': 'SimpsForLucy'
 			},

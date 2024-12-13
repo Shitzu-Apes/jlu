@@ -17,7 +17,7 @@ mode = "smart"
 [vars]
 TWITTER_CLIENT_ID = "V1pmZnRIcTJqZnNNbFNILTNnQXI6MTpjaQ"
 TWITTER_LUCY_USER_ID = "1861724864756822016"
-OPENAI_API_URL = "https://api.cerebras.ai"
+CEREBRAS_API_URL = "https://api.cerebras.ai"
 NEAR_ACCOUNT_ID = "juicylucy.near"
 JLU_TOKEN_ID = "jlu-1018.meme-cooking.near"
 JLU_PER_POINT = "30000000000000000000"
@@ -26,14 +26,19 @@ JLU_PER_POINT = "30000000000000000000"
 bindings = [
   { name = "SESSION", class_name = "Session" },
   { name = "FLIRTBATTLE", class_name = "FlirtBattle" },
+  { name = "TWEETS", class_name = "Tweets" },
 ]
 
 [triggers]
-crons = ["0/30 * * * *"]
+crons = ["0/30 * * * *", "* * * * *"]
 
 [[migrations]]
 tag = "v1"
 new_classes = ["Session", "FlirtBattle"]
+
+[[migrations]]
+tag = "v2"
+new_classes = ["Tweets"]
 
 [[kv_namespaces]]
 binding = "KV"

@@ -3,9 +3,12 @@ import { cors } from 'hono/cors';
 import { poweredBy } from 'hono/powered-by';
 import type { HTTPResponseError } from 'hono/types';
 
+import type { EnvBindings } from '../types';
+
 import { auth } from './auth';
 import { chat } from './chat';
 import { getLucySession } from './session';
+import { scheduleTweet, tweet } from './tweet';
 
 const app = new Hono<Env>();
 
@@ -20,6 +23,7 @@ app.use(
 
 app.route('/auth', auth);
 app.route('/chat', chat);
+app.route('/tweet', tweet);
 
 app.post('/refresh', async (c) => {
 	console.log('Refreshing Lucy session');
@@ -55,16 +59,24 @@ export default {
 	fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		return app.fetch(request, env, ctx);
 	},
-	async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-		await app.fetch(
-			new Request('https://api.juicyl.com/refresh', {
-				method: 'POST'
-			}),
-			env,
-			ctx
-		);
+	async scheduled(controller: ScheduledController, env: EnvBindings, ctx: ExecutionContext) {
+		switch (controller.cron) {
+			case '0/30 * * * *':
+				await app.fetch(
+					new Request('https://api.juicyl.com/refresh', {
+						method: 'POST'
+					}),
+					env,
+					ctx
+				);
+				break;
+			case '* * * * *':
+				await scheduleTweet(env, ctx);
+				break;
+		}
 	}
 };
 
 export { FlirtBattle } from './chat';
 export { Session } from './session';
+export { Tweets } from './tweet';
