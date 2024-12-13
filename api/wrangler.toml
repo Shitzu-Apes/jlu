@@ -30,7 +30,7 @@ bindings = [
 ]
 
 [triggers]
-crons = ["0/30 * * * *", "* * * * *"]
+crons = ["0/30 * * * *", "*/2 * * * *"]
 
 [[migrations]]
 tag = "v1"

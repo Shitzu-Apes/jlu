@@ -19,6 +19,10 @@ interface EnvBindings {
 	NEAR_ACCOUNT_ID: string;
 	JLU_TOKEN_ID: string;
 	JLU_PER_POINT: string;
+	TWITTER_API_KEY: string;
+	TWITTER_API_SECRET: string;
+	TWITTER_ACCESS_TOKEN: string;
+	TWITTER_ACCESS_SECRET: string;
 }
 
 declare module 'hono' {

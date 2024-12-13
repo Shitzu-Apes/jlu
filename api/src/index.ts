@@ -70,7 +70,7 @@ export default {
 					ctx
 				);
 				break;
-			case '* * * * *':
+			case '*/2 * * * *':
 				await scheduleTweet(env, ctx);
 				break;
 		}
