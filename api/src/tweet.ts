@@ -10,6 +10,18 @@ import type { EnvBindings } from '../types';
 import { twitterRequest } from './oauth1';
 
 export const tweet = new Hono<Env>()
+	.get('/history', async (c) => {
+		const tweets = c.env.TWEETS.idFromName('tweets');
+		const tweetsDo = c.env.TWEETS.get(tweets);
+
+		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/history'));
+		if (!response.ok) {
+			return c.text('', { status: response.status });
+		}
+
+		const result = await response.json<Tweet>();
+		return c.json(result);
+	})
 	.get('/current', async (c) => {
 		const tweets = c.env.TWEETS.idFromName('tweets');
 		const tweetsDo = c.env.TWEETS.get(tweets);
@@ -506,6 +518,9 @@ export class Tweets extends DurableObject {
 				await this.state.storage.delete('currentTweet');
 
 				return new Response(null, { status: 204 });
+			})
+			.get('/history', async (c) => {
+				return c.json(this.historicTweets);
 			})
 			.get('/current', async (c) => {
 				if (this.currentTweet == null) {
