@@ -1,3 +1,8 @@
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import { Hono, type Env } from 'hono';
 import { cors } from 'hono/cors';
 import { poweredBy } from 'hono/powered-by';
@@ -9,6 +14,15 @@ import { auth } from './auth';
 import { chat } from './chat';
 import { getLucySession } from './session';
 import { scheduleTweet, tweet } from './tweet';
+
+// eslint-disable-next-line import/no-named-as-default-member
+dayjs.extend(duration);
+// eslint-disable-next-line import/no-named-as-default-member
+dayjs.extend(relativeTime);
+// eslint-disable-next-line import/no-named-as-default-member
+dayjs.extend(timezone);
+// eslint-disable-next-line import/no-named-as-default-member
+dayjs.extend(utc);
 
 const app = new Hono<Env>();
 

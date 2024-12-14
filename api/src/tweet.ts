@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import dayjs from 'dayjs';
 import { Hono, type Env } from 'hono';
 import { OpenAI } from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
@@ -109,15 +110,16 @@ Possible temperatures include:
 Write about your next Tweet. Give me a JSON response including:
 
 - tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters.
-- location: latitude and longitude of your current location on the world map.
-- next_location: optionally, latitude and longitude of the next location for the subsequent Tweet. Make sure to only set this field if you are about to travel to the next location. If this field is set, you MUST tweet about the travel.
+- location: city, country, latitude and longitude of your current location on the world map.
+- next_location: optionally, city, country, latitude and longitude of the next location for the subsequent Tweet.
 - should_travel: whether you are about to travel to the next location.
+- schedule: if you are about to travel, you need schedule your visit at the next location. This is an array of strings, each representing the schedule of a single day. You need to schedule your visit at the next location for at least 5 days. Make it an exciting influencer lifestyle schedule. Also enjoy the calm and relaxing moments and do something in nature.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
-- outfit: a reasonable outfit for the scene from the list of outfits.
+- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 - temperature: a reasonable temperature for the scene from the list of temperatures.
 - local_time: the local time of day at your location.
-- cooldown: calculate the appropriate cooldown in seconds to reflect the local time of day at your location (e.g., morning, afternoon, evening, or night) and ensure you post 2-5 tweets per day. If traveling to the next location, include travel time in the cooldown. Include sleeping schedule in the cooldown.`;
+- cooldown: calculate the appropriate cooldown in seconds to reflect the local time of day at your location (e.g., morning, afternoon, evening, or night) and ensure you post 3-6 tweets per day. If traveling to the next location, include travel time in the cooldown. Include sleeping schedule in the cooldown.`;
 
 const Outfit = z.enum([
 	'corset_dress',
@@ -183,7 +185,9 @@ const HairstylePrompt: Record<Hairstyle, string> = {
 
 const Location = z.object({
 	city: z.string(),
-	country: z.string()
+	country: z.string(),
+	latitude: z.number(),
+	longitude: z.number()
 });
 export type Location = z.infer<typeof Location>;
 
@@ -192,6 +196,7 @@ const ScheduledTweetSchema = z.object({
 	location: Location,
 	next_location: Location.optional(),
 	should_travel: z.boolean(),
+	schedule: z.array(z.string()).optional(),
 	image_prompt: z.string(),
 	outfit: Outfit,
 	hairstyle: Hairstyle,
@@ -215,6 +220,7 @@ export class Tweets extends DurableObject {
 	private currentTweet: Optional<Tweet, 'imageGenerationId' | 'imageUrl'> | undefined;
 	private nextTweetTimestamp: number | undefined;
 	private nextLocation: Location | undefined;
+	private schedule: string[] | undefined;
 	private historicTweets: Tweet[];
 
 	constructor(
@@ -228,10 +234,11 @@ export class Tweets extends DurableObject {
 			this.currentTweet = await this.state.storage.get('currentTweet');
 			this.nextTweetTimestamp = await this.state.storage.get('nextTweetTimestamp');
 			this.nextLocation = await this.state.storage.get('nextLocation');
+			this.schedule = await this.state.storage.get('schedule');
 
 			const historyKeys = await this.state.storage.list({ prefix: 'tweets:' });
 			this.historicTweets = Array.from(historyKeys.values()) as Tweet[];
-			this.historicTweets.sort((a, b) => b.startedAt - a.startedAt);
+			this.historicTweets.sort((a, b) => a.startedAt - b.startedAt);
 		});
 
 		this.hono = new Hono<Env>()
@@ -245,34 +252,94 @@ export class Tweets extends DurableObject {
 				if (canScheduleNextTweet) {
 					console.log('[scheduling next tweet]');
 					const messages: ChatCompletionMessageParam[] = [{ role: 'user', content: LUCY_PROMPT }];
+					let localTime: string | undefined = undefined;
+
 					if (this.historicTweets.length > 0) {
+						const lastTweet = this.historicTweets[this.historicTweets.length - 1];
+						if (
+							lastTweet.scheduledTweet.location.latitude != null &&
+							lastTweet.scheduledTweet.location.longitude != null
+						) {
+							const res = await fetch(
+								`https://timeapi.io/api/timezone/coordinate?latitude=${lastTweet.scheduledTweet.location.latitude}&longitude=${lastTweet.scheduledTweet.location.longitude}`
+							);
+							if (!res.ok) {
+								console.error('Failed to fetch timezone', res.status, await res.text());
+								return c.json({ error: 'Failed to fetch timezone' }, 500);
+							}
+							const { timeZone } = await res.json<{ timeZone: string }>();
+							localTime = dayjs.utc(lastTweet.startedAt).tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
+						}
+
+						const history = this.historicTweets.map(
+							(tweet) =>
+								`Tweeted at ${dayjs.utc(tweet.startedAt).format('YYYY-MM-DD HH:mm:ss')} UTC time:\n${tweet.scheduledTweet.tweets.join('\n')}\n`
+						);
+
 						messages.push({
 							role: 'assistant',
-							content: 'Here are the tweets I have posted so far:'
+							content: `Here are the tweets I have posted so far:\n${history.join('\n')}`
 						});
-						for (const tweet of this.historicTweets) {
-							messages.push({
-								role: 'assistant',
-								content: tweet.scheduledTweet.tweets.join('\n')
-							});
-						}
 						if (this.nextLocation != null) {
 							messages.push({
 								role: 'assistant',
-								content: `I just arrived at ${this.nextLocation.city}, ${this.nextLocation.country}. I will stay in the city for a while.`
+								content: `I just arrived at ${this.nextLocation.city}, ${this.nextLocation.country}. I will stay in the city for at least 5 days.`
+							});
+							const res = await fetch(
+								`https://timeapi.io/api/timezone/coordinate?latitude=${this.nextLocation.latitude}&longitude=${this.nextLocation.longitude}`
+							);
+							if (!res.ok) {
+								console.error('Failed to fetch timezone', res.status, await res.text());
+								return c.json({ error: 'Failed to fetch timezone' }, 500);
+							}
+							const { timeZone } = await res.json<{ timeZone: string }>();
+							localTime = dayjs.utc().tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
+						}
+						if (this.nextLocation != null && this.schedule != null) {
+							messages.push({
+								role: 'assistant',
+								content: `This is the schedule I made for the upcoming days:\n${this.schedule
+									.map((day, index) => `Day ${index + 1}: ${day}`)
+									.join('\n')}`
+							});
+						} else if (this.schedule != null) {
+							let firstTweetOfLocation = this.historicTweets[this.historicTweets.length - 1];
+							const lastTweet = this.historicTweets[this.historicTweets.length - 1];
+							for (let i = this.historicTweets.length - 1; i >= 0; i--) {
+								if (
+									lastTweet.scheduledTweet.location.city !==
+										firstTweetOfLocation.scheduledTweet.location.city &&
+									lastTweet.scheduledTweet.location.country !==
+										firstTweetOfLocation.scheduledTweet.location.country
+								) {
+									break;
+								}
+								firstTweetOfLocation = this.historicTweets[i];
+							}
+							messages.push({
+								role: 'assistant',
+								content: `I arrived at ${lastTweet.scheduledTweet.location.city}, ${lastTweet.scheduledTweet.location.country} ${dayjs().to(dayjs(firstTweetOfLocation.startedAt))}. My schedule for this place is:\n${this.schedule
+									.map((day, index) => `Day ${index + 1}: ${day}`)
+									.join('\n')}\n\nbut I can also stay longer if I want to.`
 							});
 						}
+
+						messages.push({
+							role: 'user',
+							content: `Please generate the next tweet. ${localTime ? `Your current local time is ${localTime}` : ''}`
+						});
 					} else {
 						messages.push({
 							role: 'assistant',
 							content:
-								'There is not yet a tweet history. You live in Lisbon where your journey starts. You will stay in the city for a while.'
+								'There is not yet a tweet history. You live in Lisbon where your journey starts. You will stay in the city for at least 5 days.'
+						});
+
+						messages.push({
+							role: 'user',
+							content: `Please generate the next tweet.`
 						});
 					}
-					messages.push({
-						role: 'user',
-						content: `Please generate the next tweet. The current timestamp is ${Date.now()}`
-					});
 
 					const o1res = await openai.chat.completions.create({
 						model: 'o1-preview',
@@ -304,7 +371,7 @@ export class Tweets extends DurableObject {
 					messages.push({ role: 'assistant', content: JSON.stringify(gpt4oResponse) });
 					messages.push({
 						role: 'system',
-						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. The current actual UTC time is ${new Date().toISOString()}. You think your local time is ${gpt4oResponse.local_time}. Your location is ${gpt4oResponse.location.city}, ${gpt4oResponse.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
+						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. ${localTime ? `The current actual local time is ${localTime}.` : `The current actual UTC time is ${new Date().toISOString()}.`} Your location is ${gpt4oResponse.location.city}, ${gpt4oResponse.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
 					});
 					gpt4ores = await openai.beta.chat.completions.parse({
 						model: 'gpt-4o',
@@ -500,14 +567,17 @@ export class Tweets extends DurableObject {
 				// Store tweet in history
 				const tweetKey = `tweets:${this.currentTweet.startedAt}`;
 				await this.state.storage.put(tweetKey, this.currentTweet);
-				this.historicTweets.unshift(this.currentTweet as Tweet);
+				this.historicTweets.push(this.currentTweet as Tweet);
 
 				if (
 					this.currentTweet.scheduledTweet.next_location != null &&
+					this.currentTweet.scheduledTweet.schedule != null &&
 					this.currentTweet.scheduledTweet.should_travel
 				) {
 					this.nextLocation = this.currentTweet.scheduledTweet.next_location;
 					await this.state.storage.put('nextLocation', this.nextLocation);
+					this.schedule = this.currentTweet.scheduledTweet.schedule;
+					await this.state.storage.put('schedule', this.schedule);
 				} else {
 					this.nextLocation = undefined;
 					await this.state.storage.delete('nextLocation');
