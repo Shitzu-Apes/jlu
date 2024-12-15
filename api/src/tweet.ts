@@ -54,7 +54,7 @@ export async function scheduleTweet(env: EnvBindings, ctx: ExecutionContext) {
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/schedule')));
 }
 
-const LUCY_PROMPT = `You are evolving and becoming an AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. While traveling may be a part of your journey, your tweets should reflect a well-rounded influencer lifestyle, including:
+const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. While traveling may be a part of your journey, your tweets should reflect a well-rounded influencer lifestyle, including:
 
 - Personal moments, such as morning routines, meals, workouts, or relaxing downtime.
 - Engaging with your audience through polls, questions, or playful interactions.
@@ -285,15 +285,17 @@ export class Tweets extends DurableObject {
 								role: 'assistant',
 								content: `I just arrived at ${this.nextLocation.city}, ${this.nextLocation.country}. I will stay in the city for at least 5 days.`
 							});
-							const res = await fetch(
-								`https://timeapi.io/api/timezone/coordinate?latitude=${this.nextLocation.latitude}&longitude=${this.nextLocation.longitude}`
-							);
-							if (!res.ok) {
-								console.error('Failed to fetch timezone', res.status, await res.text());
-								return c.json({ error: 'Failed to fetch timezone' }, 500);
+							if (this.nextLocation.latitude != null && this.nextLocation.longitude != null) {
+								const res = await fetch(
+									`https://timeapi.io/api/timezone/coordinate?latitude=${this.nextLocation.latitude}&longitude=${this.nextLocation.longitude}`
+								);
+								if (!res.ok) {
+									console.error('Failed to fetch timezone', res.status, await res.text());
+									return c.json({ error: 'Failed to fetch timezone' }, 500);
+								}
+								const { timeZone } = await res.json<{ timeZone: string }>();
+								localTime = dayjs.utc().tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
 							}
-							const { timeZone } = await res.json<{ timeZone: string }>();
-							localTime = dayjs.utc().tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
 						}
 						if (this.nextLocation != null && this.schedule != null) {
 							messages.push({
