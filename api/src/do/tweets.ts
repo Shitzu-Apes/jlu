@@ -464,6 +464,15 @@ export class Tweets extends DurableObject {
 
 				return c.json(this.currentTweet);
 			})
+			.get('/next', async (c) => {
+				return c.json(dayjs(this.nextTweetTimestamp).toISOString());
+			})
+			.get('/schedule', async (c) => {
+				return c.json(this.schedule);
+			})
+			.get('/next-location', async (c) => {
+				return c.json(this.nextLocation);
+			})
 			.delete('/current', async () => {
 				this.currentTweet = undefined;
 				await this.state.storage.delete('currentTweet');

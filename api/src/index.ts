@@ -77,7 +77,7 @@ export default {
 		switch (controller.cron) {
 			case '0/30 * * * *':
 				await app.fetch(
-					new Request('https://api.juicyl.com/refresh', {
+					new Request('https://api.juicylucy.com/refresh', {
 						method: 'POST'
 					}),
 					env,

@@ -29,6 +29,42 @@ export const tweet = new Hono<Env>()
 		const result = await response.json<Tweet>();
 		return c.json(result);
 	})
+	.get('/next', async (c) => {
+		const tweets = c.env.TWEETS.idFromName('tweets');
+		const tweetsDo = c.env.TWEETS.get(tweets);
+
+		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/next'));
+		if (!response.ok) {
+			return c.text('', { status: response.status });
+		}
+
+		const result = await response.json<Tweet>();
+		return c.json(result);
+	})
+	.get('/schedule', async (c) => {
+		const tweets = c.env.TWEETS.idFromName('tweets');
+		const tweetsDo = c.env.TWEETS.get(tweets);
+
+		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/schedule'));
+		if (!response.ok) {
+			return c.text('', { status: response.status });
+		}
+
+		const result = await response.json<Tweet>();
+		return c.json(result);
+	})
+	.get('/next-location', async (c) => {
+		const tweets = c.env.TWEETS.idFromName('tweets');
+		const tweetsDo = c.env.TWEETS.get(tweets);
+
+		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/next-location'));
+		if (!response.ok) {
+			return c.text('', { status: response.status });
+		}
+
+		const result = await response.json<Tweet>();
+		return c.json(result);
+	})
 	.delete('/current', async (c) => {
 		if (c.req.header('Authorization') !== `Bearer ${c.env.TWITTER_BEARER_TOKEN}`) {
 			return c.text('Unauthorized', { status: 401 });
