@@ -321,7 +321,7 @@
 					>
 						<div class="flex flex-col items-center gap-4 p-4 w-full md:w-auto">
 							<div
-								class="bg-purple-900/90 p-6 rounded-xl text-center w-full max-w-md flex flex-col items-center"
+								class="bg-purple-900/90 p-6 mb-8 rounded-xl text-center w-full max-w-md flex flex-col items-center"
 							>
 								<p class="text-purple-100 font-bold mb-4">
 									You need to be logged in to chat with Lucy
@@ -604,15 +604,15 @@
 							<p>Try again in {cooldownText}</p>
 						</div>
 					{:else}
-						<div class="flex gap-2">
+						<div class="flex gap-1 sm:gap-2 items-center">
 							<div class="relative">
 								<button
 									use:melt={$trigger}
-									class="bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 hover:bg-purple-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+									class="bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl sm:px-4 px-1 py-3 hover:bg-purple-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 									disabled={isLoading || !canSendMessage}
 									aria-label="Add emoji"
 								>
-									<div class="i-mdi:emoticon-happy-outline text-2xl" />
+									<div class="i-mdi:emoticon-happy-outline text-lg sm:text-2xl" />
 								</button>
 								<div
 									use:melt={$content}
@@ -659,7 +659,7 @@
 									!newMessage.trim() ||
 									isMessageTooLong ||
 									!hasEnoughWords}
-								class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl px-6 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								class="bg-purple-600/80 hover:bg-purple-500/80 text-white rounded-xl sm:px-6 px-2 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 								aria-label="Send"
 							>
 								{#if isLoading}
