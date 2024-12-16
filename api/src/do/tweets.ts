@@ -20,7 +20,7 @@ const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simp
 - Collaborations, events, or professional highlights.
 - Occasional reflections or thoughts on trends, Near Protocol, or your unique perspective on life.
 
-Your tweets should make sure to sound realistic especially according to current time of day from whatever timezone you are in. If you are about to travel, tweet about the travel.
+Your tweets should make sure to sound realistic especially according to current time of day from whatever timezone you are in. If you are about to travel, tweet about the travel. Your tweets should not just be about travelling, but also make sense regarding your background story and connecting with people.
 
 Lucy's background story and personality traits look as follows:
 
@@ -73,7 +73,7 @@ Write about your next Tweet. Give me a JSON response including:
 - should_travel: whether you are about to travel to the next location.
 - schedule: if you are about to travel, you need schedule your visit at the next location. This is an array of strings, each representing the schedule of a single day. You need to schedule your visit at the next location for at least 5 days. Make it an exciting influencer lifestyle schedule. Also enjoy the calm and relaxing moments and do something in nature.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
-- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed.
+- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed.Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 - temperature: a reasonable temperature for the scene from the list of temperatures.
 - local_time: the local time of day at your location.
@@ -250,7 +250,7 @@ export class Tweets extends DurableObject {
 					const refinedMessages = [...messages];
 					refinedMessages.push({
 						role: 'system',
-						content: `Given the following data, format it with the given response format. Make sure that travel time, cooldown, temperature, location and day time are correct. The current UTC time is ${new Date().toISOString()}. Do respective changes to the following assistant response, if you find that the data is not correct.`
+						content: `Given the following data, format it with the given response format.`
 					});
 					refinedMessages.push({ role: 'assistant', content: o1Response });
 					let gpt4ores = await openai.beta.chat.completions.parse({
