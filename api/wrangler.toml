@@ -27,10 +27,11 @@ bindings = [
   { name = "SESSION", class_name = "Session" },
   { name = "FLIRTBATTLE", class_name = "FlirtBattle" },
   { name = "TWEETS", class_name = "Tweets" },
+  { name = "TWEET_SEARCH", class_name = "TweetSearch" },
 ]
 
 [triggers]
-crons = ["0/30 * * * *", "* * * * *"]
+crons = ["0/30 * * * *", "* * * * *", "15 * * * *"]
 
 [[migrations]]
 tag = "v1"
@@ -39,6 +40,10 @@ new_classes = ["Session", "FlirtBattle"]
 [[migrations]]
 tag = "v2"
 new_classes = ["Tweets"]
+
+[[migrations]]
+tag = "v3"
+new_classes = ["TweetSearch"]
 
 [[kv_namespaces]]
 binding = "KV"

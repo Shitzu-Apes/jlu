@@ -13,7 +13,7 @@ import type { EnvBindings } from '../types';
 import { auth } from './auth';
 import { chat } from './chat';
 import { getLucySession } from './session';
-import { scheduleTweet, tweet } from './tweet';
+import { processReplies, scheduleTweet, searchAiAgentsTweets, tweet } from './tweet';
 
 // eslint-disable-next-line import/no-named-as-default-member
 dayjs.extend(duration);
@@ -85,7 +85,10 @@ export default {
 				);
 				break;
 			case '* * * * *':
-				await scheduleTweet(env, ctx);
+				await Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]);
+				break;
+			case '15 * * * *':
+				await searchAiAgentsTweets(env, ctx);
 				break;
 		}
 	}
@@ -93,4 +96,5 @@ export default {
 
 export { FlirtBattle } from './chat';
 export { Session } from './session';
-export { Tweets } from './tweet';
+export { Tweets } from './do/tweets';
+export { TweetSearch } from './do/tweetSearch';

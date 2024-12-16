@@ -2,7 +2,7 @@ import { Action, actionCreators } from '@near-js/transactions';
 import { DurableObject } from 'cloudflare:workers';
 import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
-import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
+import { type TiktokenModel } from 'js-tiktoken';
 import { connect, utils } from 'near-api-js';
 import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
 import type { KeyPairString } from 'near-api-js/lib/utils';
@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import type { Auth } from './auth';
 import { requireAuth } from './middleware/auth';
+import { countTokens, type OpenAIResponse } from './prompt';
 import { getLucySession } from './session';
 
 // Response schemas
@@ -61,20 +62,6 @@ interface LucyMessage extends BaseMessage {
 }
 
 type Message = UserMessage | LucyMessage;
-
-// Get exact token count using tiktoken
-function countTokens(text: string, model: TiktokenModel): number {
-	if (model === ('llama-3.3-70b' as TiktokenModel)) {
-		// Simple approximation: average English word is ~4 characters
-		// and Llama typically uses ~1.3 tokens per word
-		const wordCount = text.split(/\s+/).length;
-		return Math.ceil(wordCount * 1.3);
-	}
-
-	const enc = encodingForModel(model);
-	const tokens = enc.encode(text);
-	return tokens.length;
-}
 
 type ModelSelection = {
 	model: TiktokenModel;
@@ -255,20 +242,6 @@ async function retweet(auth: Auth, tweetId: string, c: Context<Env>): Promise<vo
 		return c.json({ error: `Failed to retweet: ${text}` }, 500);
 	}
 }
-
-// Add this type for OpenAI API responses
-type OpenAIResponse = {
-	choices: Array<{
-		message: {
-			content: string;
-		};
-	}>;
-	usage: {
-		prompt_tokens: number;
-		completion_tokens: number;
-		total_tokens: number;
-	};
-};
 
 // Replace the evaluateConversation function
 async function evaluateConversation(

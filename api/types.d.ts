@@ -1,12 +1,16 @@
 import type { FlirtBattle } from './src/chat';
+import type { TweetSearch } from './src/do/tweets';
+import type { Tweets } from './src/do/tweets';
 import type { Session } from './src/session';
-import type { Tweets } from './src/tweet';
+
+type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 interface EnvBindings {
 	KV: KVNamespace;
 	SESSION: DurableObjectNamespace<Session>;
 	FLIRTBATTLE: DurableObjectNamespace<FlirtBattle>;
 	TWEETS: DurableObjectNamespace<Tweets>;
+	TWEET_SEARCH: DurableObjectNamespace<TweetSearch>;
 	TWITTER_CLIENT_ID: string;
 	TWITTER_CLIENT_SECRET: string;
 	CEREBRAS_API_URL: string;
