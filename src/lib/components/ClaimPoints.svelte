@@ -21,7 +21,7 @@
 				body: { walletAddress }
 			});
 			if (!response.ok) {
-				showToast('Failed to claim points. Please try again later.');
+				showToast(`Failed to claim points. ${await response.text()}`);
 				return;
 			}
 

@@ -564,6 +564,10 @@ export const chat = new Hono<Env>()
 			return c.text('Failed to get conversation', { status: response.status });
 		}
 
+		if (!walletAddress.match(/^[a-z0-9-_.]+[a-z0-9]$/)) {
+			return c.text('Invalid wallet address', { status: 400 });
+		}
+
 		const { messages, points, evaluation } = await response.json<{
 			messages: Message[];
 			points: number;
