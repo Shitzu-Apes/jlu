@@ -8,7 +8,7 @@ import { generateImage } from '../leonardo';
 import { twitterRequest } from '../oauth1';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
-
+import type { EngageableTweet, TweetSearchResponse } from '../tweet_types';
 const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
 Lucy's background story and personality traits look as follows:
@@ -71,59 +71,10 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-type TweetSearchData = {
-	id: string;
-	text: string;
-	author_id: string;
-	created_at: string;
-	public_metrics: {
-		like_count: number;
-		reply_count: number;
-		retweet_count: number;
-		quote_count: number;
-		impression_count: number;
-	};
-};
-
-type TweetSearchUser = {
-	id: string;
-	name: string;
-	username: string;
-	verified: boolean;
-	description: string;
-	created_at: string;
-	public_metrics: {
-		followers_count: number;
-		following_count: number;
-		tweet_count: number;
-		like_count: number;
-		listed_count: number;
-	};
-};
-
-type TweetSearchResponse = {
-	data: TweetSearchData[];
-	includes: {
-		users: TweetSearchUser[];
-	};
-};
-
-type EngageableTweet = {
-	tweet: TweetSearchData & {
-		author: TweetSearchUser;
-	};
-	lucyTweets?: string[];
-	imagePrompt?: string;
-	outfit?: Outfit;
-	hairstyle?: Hairstyle;
-	imageGenerationId?: string;
-	imageUrl?: string;
-};
-
 const Queries: Record<string, string> = {
 	ai_agents:
 		'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en',
-	near: '("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en'
+	near: '("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en'
 };
 
 export class TweetSearch extends DurableObject {
@@ -178,7 +129,7 @@ export class TweetSearch extends DurableObject {
 					.filter((tweet) => {
 						const author = tweets.includes.users.find((user) => user.id === tweet.author_id);
 						return (
-							tweet.public_metrics.impression_count >= 25 &&
+							(tweet.public_metrics?.impression_count ?? 0) >= 25 &&
 							author != null &&
 							dayjs(author.created_at).isBefore(dayjs().subtract(3, 'months')) &&
 							!(
@@ -200,6 +151,14 @@ export class TweetSearch extends DurableObject {
 								}
 							}) satisfies EngageableTweet
 					);
+
+				// TODO evaluate threads and store in KV
+				// if (query === 'near') {
+				// 	for (const tweet of filteredTweets) {
+				// 		await pullThread(tweet, this.env);
+				// 	}
+				// }
+
 				console.log('[filteredTweets]', JSON.stringify(filteredTweets, null, 2));
 
 				this.tweets = filteredTweets;

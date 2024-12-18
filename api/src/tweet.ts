@@ -3,6 +3,8 @@ import { Hono, type Env } from 'hono';
 import type { EnvBindings } from '../types';
 
 import type { Tweet } from './do/tweets';
+import type { TweetSearchData, TweetSearchResponse } from './tweet_types';
+import type { EngageableTweet } from './tweet_types';
 
 export const tweet = new Hono<Env>()
 	.get('/history', async (c) => {
@@ -103,4 +105,43 @@ export async function processReplies(env: EnvBindings, ctx: ExecutionContext) {
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);
 
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/replies')));
+}
+
+export async function pullThread(tweet: EngageableTweet, env: EnvBindings) {
+	const searchParams = new URLSearchParams();
+	searchParams.set(
+		'query',
+		`conversation_id:${tweet.tweet.id} from:${tweet.tweet.author.username}`
+	);
+	searchParams.set('max_results', '100');
+	searchParams.set('tweet.fields', 'referenced_tweets');
+	searchParams.set('expansions', 'author_id');
+	const res = await fetch(`https://api.x.com/2/tweets/search/recent?${searchParams.toString()}`, {
+		headers: {
+			Authorization: `Bearer ${env.TWITTER_BEARER_TOKEN}`
+		}
+	});
+
+	const tweets = await res.json<TweetSearchResponse>();
+	const thread: TweetSearchData[] = [];
+
+	let currentTweet: TweetSearchData = tweet.tweet;
+	if (tweets.data != null) {
+		while (tweets.data.length > 0) {
+			const referencedTweet = tweets.data.find((t) =>
+				t.referenced_tweets?.find((rt) => rt.type === 'replied_to' && rt.id === currentTweet.id)
+			);
+			if (referencedTweet != null) {
+				const author = tweets.includes.users.find((user) => user.id === tweet.tweet.author_id);
+				if (author == null) {
+					break;
+				}
+				thread.push(referencedTweet);
+				currentTweet = referencedTweet;
+			} else {
+				break;
+			}
+		}
+		tweet.thread = thread;
+	}
 }
