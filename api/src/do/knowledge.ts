@@ -223,7 +223,6 @@ export class Knowledge extends DurableObject {
 									role: 'system',
 									content: `Given following newsletter, summarize the content. Only provide the summary, no other text. The summary should have as many details as possible and important information should be included. The summary should be a list of bullet points, but only full sentences.
 									Output as a JSON object with the following fields:
-									- link: link to the newsletter,
 									- summary: summary of the newsletter as an array of strings,
 									- date: date of the newsletter in YYYY-MM-DD format`
 								},

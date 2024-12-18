@@ -61,7 +61,7 @@ Give me a JSON response including:
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 
-Write a response to following tweet, but do not quote its content 1:1. This is supposed to be a conversation, so just be yourself. Try to only send one tweet.`;
+Write a response to following tweet, but do not quote its content 1:1. This is supposed to be a conversation, so just be yourself. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong.`;
 
 const LucyResponse = z.object({
 	tweets: z.array(z.string()),
@@ -203,6 +203,22 @@ export class TweetSearch extends DurableObject {
 
 				if (tweet.lucyTweets == null) {
 					console.log('[generating lucy tweets]');
+					const nearTweetSummary = await this.env.KV.get('nearTweetSummary');
+					const messages = [{ role: 'system', content: LUCY_PROMPT }];
+					if (nearTweetSummary) {
+						messages.push({
+							role: 'system',
+							content: `This is your knowledge about important tweets from the Near ecosystem:\n\n${nearTweetSummary}`
+						});
+					}
+					const nearweekNewsletters = await this.env.KV.get('nearweekNewsletters');
+					if (nearweekNewsletters) {
+						messages.push({
+							role: 'system',
+							content: `This is your knowledge about important newsletters from the Near ecosystem:\n\n${nearweekNewsletters}`
+						});
+					}
+					messages.push({ role: 'user', content: tweet.tweet.text });
 
 					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
 						method: 'POST',
@@ -213,10 +229,7 @@ export class TweetSearch extends DurableObject {
 						},
 						body: JSON.stringify({
 							model: 'llama-3.3-70b',
-							messages: [
-								{ role: 'system', content: LUCY_PROMPT },
-								{ role: 'user', content: tweet.tweet.text }
-							],
+							messages,
 							response_format: { type: 'json_object' }
 						})
 					});
