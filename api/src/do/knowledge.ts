@@ -6,12 +6,14 @@ import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
 import type { OpenAIResponse } from '../prompt';
+import { pullThread } from '../tweet';
 
 type TweetKnowledge = {
 	id: string;
 	text: string;
 	author_id: string;
 	created_at: string;
+	thread?: string[];
 };
 
 const NearweekNewsletterResponse = z.object({
@@ -52,7 +54,7 @@ export class Knowledge extends DurableObject {
 				const searchParams = new URLSearchParams();
 				searchParams.set(
 					'query',
-					'(from:NEARWEEK OR from:NEARProtocol OR from:shitzuonnear OR from:memedotcooking) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -af -"#1" -reminder lang:en'
+					'(from:NEARWEEK OR from:NEARProtocol OR from:shitzuonnear OR from:memedotcooking OR from:NEARQuant) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -af -"#1" -reminder lang:en'
 				);
 				searchParams.set('expansions', 'author_id,referenced_tweets.id');
 				searchParams.set('tweet.fields', 'note_tweet,referenced_tweets,created_at');
@@ -75,7 +77,7 @@ export class Knowledge extends DurableObject {
 				}
 				const jsonRes = await res.json<{
 					data: (TweetKnowledge & {
-						referenced_tweets?: { id: string }[];
+						referenced_tweets?: { type: string; id: string }[];
 						note_tweet?: { text: string };
 					})[];
 					includes: {
@@ -103,20 +105,24 @@ export class Knowledge extends DurableObject {
 					} else if (tweet.referenced_tweets) {
 						continue;
 					} else {
+						const thread = await pullThread(tweet, this.env);
 						tweets.push({
 							id: tweet.id,
 							text: tweet.text,
 							author_id: tweet.author_id,
-							created_at: tweet.created_at
+							created_at: tweet.created_at,
+							thread: thread?.map((t) => t.text)
 						});
 					}
 				}
 				for (const tweet of includes.tweets) {
+					const thread = await pullThread(tweet, this.env);
 					tweets.push({
 						id: tweet.id,
 						text: tweet.text,
 						author_id: tweet.author_id,
-						created_at: tweet.created_at
+						created_at: tweet.created_at,
+						thread: thread?.map((t) => t.text)
 					});
 				}
 				tweets.sort((a, b) => Number(BigInt(b.id) - BigInt(a.id)));
@@ -138,11 +144,16 @@ export class Knowledge extends DurableObject {
 							{
 								role: 'system',
 								content:
-									'Given following tweets, summarize the content. Only provide the summary, no other text. The summary should have as many details as possible and important information should be included. The summary should be a list of bullet points. The tweets are sorted chronologically.'
+									'Given following tweets, rewrite them in a concrete but detailed, unbiased and unopinionated way. Only provide the rewrite, no other text. The rewrite should have as many details as possible and is supposed to be stored as a knowledge base. The rewrite should be a list of bullet points. The tweets are sorted chronologically.'
 							},
 							{
 								role: 'user',
-								content: this.nearTweetKnowledge.map((t) => `Tweet:\n${t.text}`).join('\n\n')
+								content: this.nearTweetKnowledge
+									.map(
+										(t) =>
+											`Tweet:\n${t.text}${t.thread != null ? `\nThread:\n${t.thread.join('\n')}` : ''}`
+									)
+									.join('\n\n')
 							}
 						]
 					})
@@ -221,7 +232,7 @@ export class Knowledge extends DurableObject {
 							messages: [
 								{
 									role: 'system',
-									content: `Given following newsletter, summarize the content. Only provide the summary, no other text. The summary should have as many details as possible and important information should be included. The summary should be a list of bullet points, but only full sentences.
+									content: `Given following newsletter, rewrite it in a concrete but detailed, unbiased and unopinionated way. Only provide the rewrite, no other text. The rewrite should have as many details as possible and is supposed to be stored as a knowledge base. Every information that should be stored as a knowledge base should be a full sentence string in the summary array. Do not provide information about the newsletter itself, only the information that should be stored as a knowledge base.
 									Output as a JSON object with the following fields:
 									- summary: summary of the newsletter as an array of strings,
 									- date: date of the newsletter in YYYY-MM-DD format`

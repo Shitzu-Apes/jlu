@@ -62,7 +62,7 @@ Give me a JSON response including:
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 
-Write a response to following tweet, but do not quote its content 1:1. This is supposed to be a conversation, so just be yourself. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong.`;
+Write a response to following tweet, but do not quote its content 1:1. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response.`;
 
 const LucyResponse = z.object({
 	tweets: z.array(z.string()),
@@ -72,12 +72,50 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-const Queries: Record<string, string> = {
-	ai_agents:
-		'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en',
-	near: '("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
-	simps:
-		'from:keirstyyy from:MaryTilesTexas from:cecilia_hsueh from:defi_darling from:evcawolfCZ from:0xFigen from:angelinooor from:x_cryptonat from:Hannahughes_ from:melimeen has:media -is:reply -is:retweet lang:en'
+type Query = 'ai_agents' | 'near' | 'simps';
+
+const Queries: Record<
+	Query,
+	{
+		query: string;
+		pullThread: boolean;
+		maxResults: number;
+		minImpressions: number;
+		checkAuthor: boolean;
+		minFollowers: number;
+		minListedCount: number;
+	}
+> = {
+	ai_agents: {
+		query:
+			'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en',
+		pullThread: true,
+		maxResults: 10,
+		minImpressions: 25,
+		checkAuthor: true,
+		minFollowers: 50,
+		minListedCount: 5
+	},
+	near: {
+		query:
+			'("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu" OR nearprotocol OR "near da" OR nightshade) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
+		pullThread: true,
+		maxResults: 10,
+		minImpressions: 10,
+		checkAuthor: true,
+		minFollowers: 25,
+		minListedCount: 0
+	},
+	simps: {
+		query:
+			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth) has:media -is:reply -is:retweet lang:en',
+		pullThread: false,
+		maxResults: 10,
+		minImpressions: 0,
+		checkAuthor: false,
+		minFollowers: 0,
+		minListedCount: 0
+	}
 };
 
 export class TweetSearch extends DurableObject {
@@ -98,15 +136,15 @@ export class TweetSearch extends DurableObject {
 		this.hono = new Hono<Env>();
 		this.hono
 			.get('/search/:query', async (c) => {
-				const query = c.req.param('query');
+				const query = c.req.param('query') as Query;
 				if (!Queries[query]) {
 					return c.json({ error: 'Invalid query' }, 400);
 				}
 				console.log('[query]', Queries[query]);
 
 				const searchParams = new URLSearchParams();
-				searchParams.set('query', Queries[query]);
-				searchParams.set('max_results', '10');
+				searchParams.set('query', Queries[query].query);
+				searchParams.set('max_results', Queries[query].maxResults.toString());
 				searchParams.set('start_time', dayjs().subtract(75, 'minutes').toISOString());
 				searchParams.set('end_time', dayjs().subtract(15, 'minutes').toISOString());
 				searchParams.set('tweet.fields', 'public_metrics');
@@ -128,37 +166,41 @@ export class TweetSearch extends DurableObject {
 					return c.json({ error: 'No tweets found' }, 404);
 				}
 
-				const filteredTweets = tweets.data
+				const filteredTweets: EngageableTweet[] = tweets.data
 					.filter((tweet) => {
+						if ((tweet.public_metrics?.impression_count ?? 0) < Queries[query].minImpressions) {
+							return false;
+						}
+						if (!Queries[query].checkAuthor) {
+							return true;
+						}
 						const author = tweets.includes.users.find((user) => user.id === tweet.author_id);
 						return (
-							(tweet.public_metrics?.impression_count ?? 0) >= 25 &&
 							author != null &&
 							dayjs(author.created_at).isBefore(dayjs().subtract(3, 'months')) &&
 							!(
 								author.description.includes('ads') ||
 								author.description.includes('promo') ||
-								author.description.includes('boost')
+								author.description.includes('boost') ||
+								author.description.includes('sponsored')
 							) &&
-							author.public_metrics.followers_count >= 50 &&
+							author.public_metrics.followers_count >= Queries[query].minFollowers &&
 							author.public_metrics.followers_count / author.public_metrics.following_count > 0.5 &&
-							author.public_metrics.listed_count >= 5
+							author.public_metrics.listed_count >= Queries[query].minListedCount
 						);
 					})
-					.map(
-						(tweet) =>
-							({
-								tweet: {
-									...tweet,
-									author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
-								}
-							}) satisfies EngageableTweet
-					);
+					.map((tweet) => ({
+						tweet: {
+							...tweet,
+							author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
+						}
+					}));
 
-				// TODO evaluate threads and store in KV
-				// if (query === 'near') {
+				// TODO store in KV knowledge
+				// if (Queries[query].pullThread) {
 				// 	for (const tweet of filteredTweets) {
-				// 		await pullThread(tweet, this.env);
+				// 		const thread = await pullThread(tweet.tweet, this.env);
+				// 		tweet.thread = thread;
 				// 	}
 				// }
 

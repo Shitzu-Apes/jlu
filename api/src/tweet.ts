@@ -4,7 +4,6 @@ import type { EnvBindings } from '../types';
 
 import type { Tweet } from './do/tweets';
 import type { TweetSearchData, TweetSearchResponse } from './tweet_types';
-import type { EngageableTweet } from './tweet_types';
 
 export const tweet = new Hono<Env>()
 	.get('/history', async (c) => {
@@ -82,7 +81,6 @@ export const tweet = new Hono<Env>()
 export async function scheduleTweet(env: EnvBindings, ctx: ExecutionContext) {
 	const tweets = env.TWEETS.idFromName('tweets');
 	const tweetsDo = env.TWEETS.get(tweets);
-
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/schedule')));
 }
 
@@ -114,12 +112,9 @@ export async function processReplies(env: EnvBindings, ctx: ExecutionContext) {
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/replies')));
 }
 
-export async function pullThread(tweet: EngageableTweet, env: EnvBindings) {
+export async function pullThread(tweet: TweetSearchData, env: EnvBindings) {
 	const searchParams = new URLSearchParams();
-	searchParams.set(
-		'query',
-		`conversation_id:${tweet.tweet.id} from:${tweet.tweet.author.username}`
-	);
+	searchParams.set('query', `conversation_id:${tweet.id} from:${tweet.author_id}`);
 	searchParams.set('max_results', '100');
 	searchParams.set('tweet.fields', 'referenced_tweets');
 	searchParams.set('expansions', 'author_id');
@@ -132,14 +127,14 @@ export async function pullThread(tweet: EngageableTweet, env: EnvBindings) {
 	const tweets = await res.json<TweetSearchResponse>();
 	const thread: TweetSearchData[] = [];
 
-	let currentTweet: TweetSearchData = tweet.tweet;
+	let currentTweet: TweetSearchData = tweet;
 	if (tweets.data != null) {
 		while (tweets.data.length > 0) {
 			const referencedTweet = tweets.data.find((t) =>
 				t.referenced_tweets?.find((rt) => rt.type === 'replied_to' && rt.id === currentTweet.id)
 			);
 			if (referencedTweet != null) {
-				const author = tweets.includes.users.find((user) => user.id === tweet.tweet.author_id);
+				const author = tweets.includes.users.find((user) => user.id === tweet.author_id);
 				if (author == null) {
 					break;
 				}
@@ -149,6 +144,6 @@ export async function pullThread(tweet: EngageableTweet, env: EnvBindings) {
 				break;
 			}
 		}
-		tweet.thread = thread;
+		return thread;
 	}
 }
