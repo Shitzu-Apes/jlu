@@ -2,29 +2,15 @@ import { DurableObject } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import type { Env } from 'hono';
 import { Parser } from 'htmlparser2';
-import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
 import type { OpenAIResponse } from '../prompt';
 import { pullThread } from '../tweet';
-
-type TweetKnowledge = {
-	id: string;
-	text: string;
-	author_id: string;
-	created_at: string;
-	thread?: string[];
-};
-
-const NearweekNewsletterResponse = z.object({
-	summary: z.array(z.string()),
-	date: z.string()
-});
-type NearweekNewsletterResponse = z.infer<typeof NearweekNewsletterResponse>;
-
-type NearweekNewsletter = {
-	link: string;
-} & NearweekNewsletterResponse;
+import {
+	NearweekNewsletterResponse,
+	type NearweekNewsletter,
+	type TweetKnowledge
+} from '../tweet_types';
 
 export class Knowledge extends DurableObject {
 	private hono: Hono<Env>;
@@ -50,7 +36,13 @@ export class Knowledge extends DurableObject {
 
 		this.hono = new Hono<Env>();
 		this.hono
-			.get('/near/tweets/update', async (c) => {
+			.get('/near/tweets', async (c) => {
+				return c.json({ tweets: this.nearTweetKnowledge, summary: this.nearTweetSummary });
+			})
+			.get('/near/nearweek', async (c) => {
+				return c.json(this.nearweekNewsletters);
+			})
+			.post('/near/tweets', async (c) => {
 				const searchParams = new URLSearchParams();
 				searchParams.set(
 					'query',
@@ -174,7 +166,7 @@ export class Knowledge extends DurableObject {
 
 				return new Response(null, { status: 204 });
 			})
-			.get('/near/nearweek/update', async (c) => {
+			.post('/near/nearweek', async (c) => {
 				const rssFeed = await fetch(
 					'https://us1.campaign-archive.com/feed?u=ed13caf5cf7d37689d81ef60b&id=86d4e11a12'
 				);

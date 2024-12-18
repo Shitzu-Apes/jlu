@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { Hairstyle } from './prompt';
 import type { Outfit } from './prompt';
 
@@ -54,3 +56,21 @@ export type EngageableTweet = {
 	imageGenerationId?: string;
 	imageUrl?: string;
 };
+
+export type TweetKnowledge = {
+	id: string;
+	text: string;
+	author_id: string;
+	created_at: string;
+	thread?: string[];
+};
+
+export const NearweekNewsletterResponse = z.object({
+	summary: z.array(z.string()),
+	date: z.string()
+});
+export type NearweekNewsletterResponse = z.infer<typeof NearweekNewsletterResponse>;
+
+export type NearweekNewsletter = {
+	link: string;
+} & NearweekNewsletterResponse;
