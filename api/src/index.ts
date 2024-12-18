@@ -14,7 +14,13 @@ import { auth } from './auth';
 import { chat } from './chat';
 import { updateNearKnowledge } from './knowledge';
 import { getLucySession } from './session';
-import { processReplies, scheduleTweet, searchAiAgentsTweets, tweet } from './tweet';
+import {
+	processReplies,
+	scheduleTweet,
+	searchAiAgentsTweets,
+	searchNearTweets,
+	tweet
+} from './tweet';
 
 // eslint-disable-next-line import/no-named-as-default-member
 dayjs.extend(duration);
@@ -90,6 +96,9 @@ export default {
 				break;
 			case '15 * * * *':
 				await searchAiAgentsTweets(env, ctx);
+				break;
+			case '45 * * * *':
+				await searchNearTweets(env, ctx);
 				break;
 			case '30 * * * *':
 				await updateNearKnowledge(env, ctx);

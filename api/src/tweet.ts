@@ -91,6 +91,13 @@ export async function searchAiAgentsTweets(env: EnvBindings, ctx: ExecutionConte
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/ai_agents')));
 }
 
+export async function searchNearTweets(env: EnvBindings, ctx: ExecutionContext) {
+	const tweets = env.TWEET_SEARCH.idFromName('tweets');
+	const tweetsDo = env.TWEET_SEARCH.get(tweets);
+
+	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/near')));
+}
+
 export async function processReplies(env: EnvBindings, ctx: ExecutionContext) {
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);

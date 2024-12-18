@@ -120,29 +120,38 @@ type EngageableTweet = {
 	imageUrl?: string;
 };
 
+const Queries: Record<string, string> = {
+	ai_agents:
+		'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en',
+	near: '("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en'
+};
+
 export class TweetSearch extends DurableObject {
 	private hono: Hono<Env>;
-	private aiAgentTweets: EngageableTweet[] = [];
+	private tweets: EngageableTweet[] = [];
 
 	constructor(
 		readonly state: DurableObjectState,
 		readonly env: EnvBindings
 	) {
 		super(state, env);
-		this.aiAgentTweets = [];
+		this.tweets = [];
 
 		this.state.blockConcurrencyWhile(async () => {
-			this.aiAgentTweets = (await this.state.storage.get('aiAgentTweets')) ?? [];
+			this.tweets = (await this.state.storage.get('tweets')) ?? [];
 		});
 
 		this.hono = new Hono<Env>();
 		this.hono
-			.get('/search/ai_agents', async (c) => {
+			.get('/search/:query', async (c) => {
+				const query = c.req.param('query');
+				if (!Queries[query]) {
+					return c.json({ error: 'Invalid query' }, 400);
+				}
+				console.log('[query]', Queries[query]);
+
 				const searchParams = new URLSearchParams();
-				searchParams.set(
-					'query',
-					'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en'
-				);
+				searchParams.set('query', Queries[query]);
 				searchParams.set('max_results', '10');
 				searchParams.set('start_time', dayjs().subtract(75, 'minutes').toISOString());
 				searchParams.set('end_time', dayjs().subtract(15, 'minutes').toISOString());
@@ -160,6 +169,10 @@ export class TweetSearch extends DurableObject {
 
 				const tweets = await res.json<TweetSearchResponse>();
 				console.log('[tweets]', JSON.stringify(tweets, null, 2));
+
+				if (!tweets.data || tweets.data.length === 0) {
+					return c.json({ error: 'No tweets found' }, 404);
+				}
 
 				const filteredTweets = tweets.data
 					.filter((tweet) => {
@@ -189,13 +202,13 @@ export class TweetSearch extends DurableObject {
 					);
 				console.log('[filteredTweets]', JSON.stringify(filteredTweets, null, 2));
 
-				this.aiAgentTweets = filteredTweets;
-				await this.state.storage.put('aiAgentTweets', this.aiAgentTweets);
+				this.tweets = filteredTweets;
+				await this.state.storage.put('tweets', this.tweets);
 
 				return new Response(null, { status: 204 });
 			})
 			.get('/replies', async (c) => {
-				const tweet = this.aiAgentTweets[0];
+				const tweet = this.tweets[0];
 
 				if (tweet == null) {
 					return new Response(null, { status: 204 });
@@ -248,12 +261,11 @@ export class TweetSearch extends DurableObject {
 						return new Response(null, { status: 500 });
 					}
 
-					// console.log('[parseResult]', parseResult.data);
 					tweet.lucyTweets = parseResult.data.tweets;
 					tweet.imagePrompt = parseResult.data.image_prompt;
 					tweet.outfit = parseResult.data.outfit;
 					tweet.hairstyle = parseResult.data.hairstyle;
-					await this.state.storage.put('aiAgentTweets', this.aiAgentTweets);
+					await this.state.storage.put('tweets', this.tweets);
 					console.log('[lucy tweets]', tweet.lucyTweets);
 					console.log('[image prompt]', tweet.imagePrompt);
 					console.log('[outfit]', tweet.outfit);
@@ -286,7 +298,7 @@ export class TweetSearch extends DurableObject {
 					}
 
 					tweet.imageGenerationId = generationId;
-					await this.state.storage.put('aiAgentTweets', this.aiAgentTweets);
+					await this.state.storage.put('tweets', this.tweets);
 					console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
 
 					return new Response(null, { status: 204 });
@@ -316,7 +328,7 @@ export class TweetSearch extends DurableObject {
 					}
 
 					tweet.imageUrl = generated_images[0].url;
-					await this.state.storage.put('aiAgentTweets', this.aiAgentTweets);
+					await this.state.storage.put('tweets', this.tweets);
 					console.log('[tweet.imageUrl]', tweet.imageUrl);
 
 					return new Response(null, { status: 204 });
@@ -396,8 +408,8 @@ export class TweetSearch extends DurableObject {
 
 					if (!tweetResponse.ok) {
 						console.error('Failed to send tweet', await tweetResponse.text());
-						this.aiAgentTweets.splice(0, 1);
-						await this.state.storage.put('aiAgentTweets', this.aiAgentTweets);
+						this.tweets.splice(0, 1);
+						await this.state.storage.put('tweets', this.tweets);
 						return c.json({ error: 'Failed to send tweet' }, 500);
 					}
 
@@ -407,8 +419,8 @@ export class TweetSearch extends DurableObject {
 					previousTweetId = id;
 				}
 
-				this.aiAgentTweets.splice(0, 1);
-				await this.state.storage.put('aiAgentTweets', this.aiAgentTweets);
+				this.tweets.splice(0, 1);
+				await this.state.storage.put('tweets', this.tweets);
 
 				return new Response(null, { status: 204 });
 			});
