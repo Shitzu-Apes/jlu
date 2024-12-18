@@ -271,6 +271,20 @@ export class Knowledge extends DurableObject {
 				);
 
 				return new Response(null, { status: 204 });
+			})
+			.delete('/near/tweets', async () => {
+				this.nearTweetKnowledge = [];
+				this.nearTweetSummary = '';
+				this.nearTweetLatestId = '';
+				await this.state.storage.delete('nearTweetKnowledge');
+				await this.state.storage.delete('nearTweetSummary');
+				await this.state.storage.delete('nearTweetLatestId');
+				return new Response(null, { status: 204 });
+			})
+			.delete('/near/nearweek', async () => {
+				this.nearweekNewsletters = [];
+				await this.state.storage.delete('nearweekNewsletters');
+				return new Response(null, { status: 204 });
 			});
 	}
 
