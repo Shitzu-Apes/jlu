@@ -9,6 +9,7 @@ import { twitterRequest } from '../oauth1';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
 import type { EngageableTweet, TweetSearchResponse } from '../tweet_types';
+
 const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
 Lucy's background story and personality traits look as follows:
@@ -74,7 +75,9 @@ export type LucyResponse = z.infer<typeof LucyResponse>;
 const Queries: Record<string, string> = {
 	ai_agents:
 		'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en',
-	near: '("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en'
+	near: '("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
+	simps:
+		'from:keirstyyy from:MaryTilesTexas from:cecilia_hsueh from:defi_darling from:evcawolfCZ from:0xFigen from:angelinooor from:x_cryptonat from:Hannahughes_ from:melimeen has:media -is:reply -is:retweet lang:en'
 };
 
 export class TweetSearch extends DurableObject {
@@ -161,7 +164,7 @@ export class TweetSearch extends DurableObject {
 
 				console.log('[filteredTweets]', JSON.stringify(filteredTweets, null, 2));
 
-				this.tweets = filteredTweets;
+				this.tweets = [...this.tweets, ...filteredTweets];
 				await this.state.storage.put('tweets', this.tweets);
 
 				return new Response(null, { status: 204 });

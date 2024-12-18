@@ -19,6 +19,7 @@ import {
 	scheduleTweet,
 	searchAiAgentsTweets,
 	searchNearTweets,
+	searchSimpsTweets,
 	tweet
 } from './tweet';
 
@@ -97,8 +98,11 @@ export default {
 			case '15 * * * *':
 				await searchAiAgentsTweets(env, ctx);
 				break;
-			case '45 * * * *':
+			case '40 * * * *':
 				await searchNearTweets(env, ctx);
+				break;
+			case '50 * * * *':
+				await searchSimpsTweets(env, ctx);
 				break;
 			case '30 * * * *':
 				await updateNearKnowledge(env, ctx);
