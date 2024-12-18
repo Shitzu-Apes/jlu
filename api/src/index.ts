@@ -12,6 +12,7 @@ import type { EnvBindings } from '../types';
 
 import { auth } from './auth';
 import { chat } from './chat';
+import { updateNearKnowledge } from './knowledge';
 import { getLucySession } from './session';
 import { processReplies, scheduleTweet, searchAiAgentsTweets, tweet } from './tweet';
 
@@ -90,6 +91,9 @@ export default {
 			case '15 * * * *':
 				await searchAiAgentsTweets(env, ctx);
 				break;
+			case '30 * * * *':
+				await updateNearKnowledge(env, ctx);
+				break;
 		}
 	}
 };
@@ -98,3 +102,4 @@ export { FlirtBattle } from './chat';
 export { Session } from './session';
 export { Tweets } from './do/tweets';
 export { TweetSearch } from './do/tweetSearch';
+export { Knowledge } from './do/knowledge';

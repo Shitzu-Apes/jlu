@@ -141,7 +141,7 @@ export class TweetSearch extends DurableObject {
 				const searchParams = new URLSearchParams();
 				searchParams.set(
 					'query',
-					'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro is:verified lang:en'
+					'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en'
 				);
 				searchParams.set('max_results', '10');
 				searchParams.set('start_time', dayjs().subtract(75, 'minutes').toISOString());

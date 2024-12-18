@@ -11,6 +11,7 @@ interface EnvBindings {
 	FLIRTBATTLE: DurableObjectNamespace<FlirtBattle>;
 	TWEETS: DurableObjectNamespace<Tweets>;
 	TWEET_SEARCH: DurableObjectNamespace<TweetSearch>;
+	KNOWLEDGE: DurableObjectNamespace<Knowledge>;
 	TWITTER_CLIENT_ID: string;
 	TWITTER_CLIENT_SECRET: string;
 	CEREBRAS_API_URL: string;
@@ -27,6 +28,8 @@ interface EnvBindings {
 	TWITTER_API_SECRET: string;
 	TWITTER_ACCESS_TOKEN: string;
 	TWITTER_ACCESS_SECRET: string;
+	TWITTER_USERNAME: string;
+	TWITTER_PASSWORD: string;
 }
 
 declare module 'hono' {
