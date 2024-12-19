@@ -57,12 +57,12 @@ Possible temperatures include:
 
 Give me a JSON response including:
 
-- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters.
+- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 
-Write a response to following tweet, but do not quote its content 1:1. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response.`;
+Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response.`;
 
 const LucyResponse = z.object({
 	tweets: z.array(z.string()),

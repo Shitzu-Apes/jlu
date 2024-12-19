@@ -67,7 +67,7 @@ Possible temperatures include:
 
 Write about your next Tweet. Give me a JSON response including:
 
-- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters.
+- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks
 - location: city, country, latitude and longitude of your current location on the world map.
 - next_location: optionally, city, country, latitude and longitude of the next location for the subsequent Tweet.
 - should_travel: whether you are about to travel to the next location.
