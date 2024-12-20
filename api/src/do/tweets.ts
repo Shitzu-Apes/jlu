@@ -391,18 +391,15 @@ export class Tweets extends DurableObject {
 						return c.json({ error: 'Failed to send tweet' }, 500);
 					}
 
-					const {
-						data: {
-							create_tweet: {
-								tweet_results: {
-									result: { rest_id: id }
-								}
-							}
-						}
-					} = await tweetResponse.json<{
-						data: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
+					const json = await tweetResponse.json<{
+						data?: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
+						errors?: unknown;
 					}>();
-					previousTweetId = id;
+					if (json.data?.create_tweet?.tweet_results?.result?.rest_id) {
+						previousTweetId = json.data.create_tweet.tweet_results.result.rest_id;
+					} else {
+						break;
+					}
 				}
 
 				// Store tweet in history
