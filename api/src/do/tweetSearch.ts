@@ -110,7 +110,7 @@ const Queries: Record<
 	},
 	simps: {
 		query:
-			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth) has:media -is:reply -is:retweet lang:en',
+			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4) has:media -is:reply -is:retweet lang:en',
 		pullThread: false,
 		maxResults: 10,
 		minImpressions: 0,
