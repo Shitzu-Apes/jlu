@@ -58,6 +58,7 @@ Possible temperatures include:
 Give me a JSON response including:
 
 - tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks.
+- generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 25% chance to generate an image.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
@@ -66,6 +67,7 @@ Write a response to following tweet, but do not quote or repeat its content. Thi
 
 const LucyResponse = z.object({
 	tweets: z.array(z.string()),
+	generate_image: z.boolean(),
 	image_prompt: z.string(),
 	outfit: Outfit,
 	hairstyle: Hairstyle
@@ -269,11 +271,13 @@ export class TweetSearch extends DurableObject {
 					}
 
 					tweet.lucyTweets = parseResult.data.tweets;
+					tweet.generateImage = parseResult.data.generate_image;
 					tweet.imagePrompt = parseResult.data.image_prompt;
 					tweet.outfit = parseResult.data.outfit;
 					tweet.hairstyle = parseResult.data.hairstyle;
 					await this.state.storage.put('tweets', this.tweets);
 					console.log('[lucy tweets]', tweet.lucyTweets);
+					console.log('[generate_image]', tweet.generateImage);
 					console.log('[image prompt]', tweet.imagePrompt);
 					console.log('[outfit]', tweet.outfit);
 					console.log('[hairstyle]', tweet.hairstyle);
@@ -287,6 +291,67 @@ export class TweetSearch extends DurableObject {
 					tweet.outfit != null &&
 					tweet.hairstyle != null
 				) {
+					const leoRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/me`, {
+						headers: {
+							Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
+							Accept: 'application/json'
+						}
+					});
+					const {
+						user_details: [
+							{
+								apiPaidTokens,
+								user: { id: leoUserId }
+							}
+						]
+					} = await leoRes.json<{
+						user_details: { apiPaidTokens: number; user: { id: string } }[];
+					}>();
+					if (apiPaidTokens < 2_000 || !tweet.generateImage) {
+						console.log('[using previous generations]');
+						const previousGenRes = await fetch(
+							`https://cloud.leonardo.ai/api/rest/v1/generations/user/${leoUserId}?offset=0&limit=500`,
+							{
+								headers: {
+									Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
+									Accept: 'application/json'
+								}
+							}
+						);
+						const { generations: allGenerations } = await previousGenRes.json<{
+							generations: {
+								id: string;
+								status: string;
+								sdVersion: string;
+								scheduler: string;
+								presetStyle: string;
+								modelId: string;
+								generated_images: { id: string; url: string }[];
+							}[];
+						}>();
+						const generations = allGenerations.filter(
+							(gen) =>
+								gen.status === 'COMPLETE' &&
+								gen.sdVersion === 'SDXL_LIGHTNING' &&
+								gen.scheduler === 'LEONARDO' &&
+								gen.presetStyle === 'DYNAMIC' &&
+								gen.modelId === 'e71a1c2f-4f80-4800-934f-2c68979d8cc8'
+						);
+						const generation = generations[Math.floor(Math.random() * generations.length)];
+
+						if (!generation) {
+							console.error('No generation found');
+							return c.json({ error: 'No generation found' }, 500);
+						}
+
+						tweet.imageGenerationId = generation.id;
+						tweet.imageUrl = generation.generated_images[0].url;
+						await this.state.storage.put('tweets', this.tweets);
+						console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
+						console.log('[tweet.imageUrl]', tweet.imageUrl);
+						return new Response(null, { status: 204 });
+					}
+
 					console.log('[generating image]');
 					const res = await generateImage(
 						`female asian character, short dark purple hair, green eyes, realistic and curvy figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,

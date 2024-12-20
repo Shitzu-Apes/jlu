@@ -50,6 +50,7 @@ export type EngageableTweet = {
 	};
 	thread?: TweetSearchData[];
 	lucyTweets?: string[];
+	generateImage?: boolean;
 	imagePrompt?: string;
 	outfit?: Outfit;
 	hairstyle?: Hairstyle;
