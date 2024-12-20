@@ -6,9 +6,9 @@ import { z } from 'zod';
 import type { EnvBindings } from '../../types';
 import type { EngageableTweet, TweetSearchResponse } from '../definitions';
 import { generateImage } from '../leonardo';
-import { twitterRequest } from '../oauth1';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
+import { getScraper } from '../scraper';
 
 const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
@@ -349,41 +349,12 @@ export class TweetSearch extends DurableObject {
 				}
 				const imageBuffer = await imageResponse.arrayBuffer();
 
-				// Upload media to Twitter
-				const formData = new URLSearchParams();
-				formData.append('media_data', Buffer.from(imageBuffer).toString('base64'));
-
-				const uploadResponse = await twitterRequest(
-					'POST',
-					'https://upload.twitter.com/1.1/media/upload.json',
-					{},
-					{
-						apiKey: this.env.TWITTER_API_KEY,
-						apiSecret: this.env.TWITTER_API_SECRET,
-						accessToken: this.env.TWITTER_ACCESS_TOKEN,
-						accessSecret: this.env.TWITTER_ACCESS_SECRET
-					},
-					formData,
-					true
-				);
-
-				if (!uploadResponse.ok) {
-					console.error(
-						'Failed to upload media',
-						uploadResponse.status,
-						await uploadResponse.text()
-					);
-					return c.json({ error: 'Failed to upload media' }, 500);
-				}
-
-				const { media_id_string } = await uploadResponse.json<{ media_id_string: string }>();
-
 				// Send tweets as a thread
 				let previousTweetId: string | undefined;
 				for (const tweetText of tweet.lucyTweets) {
 					const tweetData: {
 						text: string;
-						media?: { media_ids: string[] };
+						media?: { data: Buffer; mediaType: string };
 						reply?: { in_reply_to_tweet_id: string };
 					} = {
 						text: tweetText
@@ -392,7 +363,8 @@ export class TweetSearch extends DurableObject {
 					// Add media to first tweet only
 					if (!previousTweetId) {
 						tweetData.media = {
-							media_ids: [media_id_string]
+							data: Buffer.from(imageBuffer),
+							mediaType: 'image/jpeg'
 						};
 						tweetData.reply = { in_reply_to_tweet_id: tweet.tweet.id };
 					} else {
@@ -400,30 +372,38 @@ export class TweetSearch extends DurableObject {
 						tweetData.reply = { in_reply_to_tweet_id: previousTweetId };
 					}
 
-					const tweetResponse = await twitterRequest(
-						'POST',
-						'https://api.twitter.com/2/tweets',
-						{},
-						{
-							apiKey: this.env.TWITTER_API_KEY,
-							apiSecret: this.env.TWITTER_API_SECRET,
-							accessToken: this.env.TWITTER_ACCESS_TOKEN,
-							accessSecret: this.env.TWITTER_ACCESS_SECRET
-						},
-						JSON.stringify(tweetData)
-					);
+					try {
+						const scraper = await getScraper(this.env);
+						const tweetResponse = await scraper.sendTweet(
+							tweetData.text,
+							tweetData.reply?.in_reply_to_tweet_id,
+							tweetData.media ? [tweetData.media] : undefined
+						);
+						console.log('[tweetResponse]', tweetResponse);
 
-					if (!tweetResponse.ok) {
-						console.error('Failed to send tweet', await tweetResponse.text());
-						this.tweets.splice(0, 1);
-						await this.state.storage.put('tweets', this.tweets);
+						if (!tweetResponse.ok) {
+							console.error('Failed to send tweet', await tweetResponse.text());
+							this.tweets.splice(0, 1);
+							await this.state.storage.put('tweets', this.tweets);
+							return c.json({ error: 'Failed to send tweet' }, 500);
+						}
+
+						const {
+							data: {
+								create_tweet: {
+									tweet_results: {
+										result: { rest_id: id }
+									}
+								}
+							}
+						} = await tweetResponse.json<{
+							data: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
+						}>();
+						previousTweetId = id;
+					} catch (error) {
+						console.error('[error]', error);
 						return c.json({ error: 'Failed to send tweet' }, 500);
 					}
-
-					const {
-						data: { id }
-					} = await tweetResponse.json<{ data: { id: string } }>();
-					previousTweetId = id;
 				}
 
 				this.tweets.splice(0, 1);

@@ -49,6 +49,7 @@ module.exports = {
 		}
 	],
 	rules: {
+		'no-case-declarations': 'off',
 		'import/order': [
 			'error',
 			{

@@ -9,8 +9,8 @@ import { z } from 'zod';
 
 import type { EnvBindings, Optional } from '../../types';
 import { generateImage } from '../leonardo';
-import { twitterRequest } from '../oauth1';
 import { Hairstyle, HairstylePrompt, Outfit, OutfitPrompt, Temperature } from '../prompt';
+import { getScraper } from '../scraper';
 
 const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. While traveling may be a part of your journey, your tweets should reflect a well-rounded influencer lifestyle, including:
 
@@ -357,41 +357,12 @@ export class Tweets extends DurableObject {
 				}
 				const imageBuffer = await imageResponse.arrayBuffer();
 
-				// Upload media to Twitter
-				const formData = new URLSearchParams();
-				formData.append('media_data', Buffer.from(imageBuffer).toString('base64'));
-
-				const uploadResponse = await twitterRequest(
-					'POST',
-					'https://upload.twitter.com/1.1/media/upload.json',
-					{},
-					{
-						apiKey: this.env.TWITTER_API_KEY,
-						apiSecret: this.env.TWITTER_API_SECRET,
-						accessToken: this.env.TWITTER_ACCESS_TOKEN,
-						accessSecret: this.env.TWITTER_ACCESS_SECRET
-					},
-					formData,
-					true
-				);
-
-				if (!uploadResponse.ok) {
-					console.error(
-						'Failed to upload media',
-						uploadResponse.status,
-						await uploadResponse.text()
-					);
-					return c.json({ error: 'Failed to upload media' }, 500);
-				}
-
-				const { media_id_string } = await uploadResponse.json<{ media_id_string: string }>();
-
 				// Send tweets as a thread
 				let previousTweetId: string | undefined;
 				for (const tweetText of this.currentTweet.scheduledTweet.tweets) {
 					const tweetData: {
 						text: string;
-						media?: { media_ids: string[] };
+						media?: { data: Buffer; mediaType: string };
 						reply?: { in_reply_to_tweet_id: string };
 					} = {
 						text: tweetText
@@ -399,23 +370,20 @@ export class Tweets extends DurableObject {
 
 					// Add media to first tweet only
 					if (!previousTweetId) {
-						tweetData.media = { media_ids: [media_id_string] };
+						tweetData.media = {
+							data: Buffer.from(imageBuffer),
+							mediaType: 'image/jpeg'
+						};
 					} else {
 						// Add reply parameters if this is part of a thread
 						tweetData.reply = { in_reply_to_tweet_id: previousTweetId };
 					}
 
-					const tweetResponse = await twitterRequest(
-						'POST',
-						'https://api.twitter.com/2/tweets',
-						{},
-						{
-							apiKey: this.env.TWITTER_API_KEY,
-							apiSecret: this.env.TWITTER_API_SECRET,
-							accessToken: this.env.TWITTER_ACCESS_TOKEN,
-							accessSecret: this.env.TWITTER_ACCESS_SECRET
-						},
-						JSON.stringify(tweetData)
+					const scraper = await getScraper(this.env);
+					const tweetResponse = await scraper.sendTweet(
+						tweetData.text,
+						tweetData.reply?.in_reply_to_tweet_id,
+						tweetData.media ? [tweetData.media] : undefined
 					);
 
 					if (!tweetResponse.ok) {
@@ -424,8 +392,16 @@ export class Tweets extends DurableObject {
 					}
 
 					const {
-						data: { id }
-					} = await tweetResponse.json<{ data: { id: string } }>();
+						data: {
+							create_tweet: {
+								tweet_results: {
+									result: { rest_id: id }
+								}
+							}
+						}
+					} = await tweetResponse.json<{
+						data: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
+					}>();
 					previousTweetId = id;
 				}
 

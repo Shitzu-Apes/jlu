@@ -97,13 +97,13 @@ export default {
 				await Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]);
 				break;
 			case '15 * * * *':
-				// await searchAiAgentsTweets(env, ctx);
+				await searchAiAgentsTweets(env, ctx);
 				break;
 			case '40 * * * *':
-				// await searchNearTweets(env, ctx);
+				await searchNearTweets(env, ctx);
 				break;
 			case '50 * * * *':
-				// await searchSimpsTweets(env, ctx);
+				await searchSimpsTweets(env, ctx);
 				break;
 			case '30 * * * *':
 				await updateNearKnowledge(env, ctx);
