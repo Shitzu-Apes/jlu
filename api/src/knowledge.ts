@@ -3,19 +3,19 @@ import { Hono } from 'hono';
 
 import type { EnvBindings } from '../types';
 
-import type { NearweekNewsletter, TweetKnowledge } from './tweet_types';
+import type { NearProjects } from './definitions';
 
 export const knowledge = new Hono<Env>()
-	.get('/near/tweets', async (c) => {
+	.get('/near/projects', async (c) => {
 		const knowledge = c.env.KNOWLEDGE.idFromName('knowledge');
 		const knowledgeDo = c.env.KNOWLEDGE.get(knowledge);
 
-		const response = await knowledgeDo.fetch(new Request('https://api.juicylucy.ai/near/tweets'));
+		const response = await knowledgeDo.fetch(new Request('https://api.juicylucy.ai/near/projects'));
 		if (!response.ok) {
 			return c.text('', { status: response.status });
 		}
 
-		const result = await response.json<{ tweets: TweetKnowledge[]; summary: string }>();
+		const result = await response.json<NearProjects[]>();
 		return c.json(result);
 	})
 	.post('/near/tweets', async (c) => {
@@ -43,18 +43,6 @@ export const knowledge = new Hono<Env>()
 			new Request('https://api.juicylucy.ai/near/tweets', { method: 'DELETE' })
 		);
 		return new Response('', { status: 204 });
-	})
-	.get('/near/nearweek', async (c) => {
-		const knowledge = c.env.KNOWLEDGE.idFromName('knowledge');
-		const knowledgeDo = c.env.KNOWLEDGE.get(knowledge);
-
-		const response = await knowledgeDo.fetch(new Request('https://api.juicylucy.ai/near/nearweek'));
-		if (!response.ok) {
-			return c.text('', { status: response.status });
-		}
-
-		const result = await response.json<NearweekNewsletter[]>();
-		return c.json(result);
 	})
 	.post('/near/nearweek', async (c) => {
 		const auth = c.req.header('Authorization');
@@ -84,6 +72,31 @@ export const knowledge = new Hono<Env>()
 			})
 		);
 		return new Response('', { status: 204 });
+	})
+	.get('/near/projects', async (c) => {
+		const knowledge = c.env.KNOWLEDGE.idFromName('knowledge');
+		const knowledgeDo = c.env.KNOWLEDGE.get(knowledge);
+
+		const response = await knowledgeDo.fetch(new Request('https://api.juicylucy.ai/near/projects'));
+		if (!response.ok) {
+			return c.text('', { status: response.status });
+		}
+
+		const result = await response.json<NearProjects[]>();
+		return c.json(result);
+	})
+	.post('/near/projects', async (c) => {
+		const auth = c.req.header('Authorization');
+		if (auth !== `Bearer ${c.env.TWITTER_BEARER_TOKEN}`) {
+			return c.text('Unauthorized', 401);
+		}
+
+		const knowledge = c.env.KNOWLEDGE.idFromName('knowledge');
+		const knowledgeDo = c.env.KNOWLEDGE.get(knowledge);
+		c.executionCtx.waitUntil(
+			knowledgeDo.fetch(new Request('https://api.juicylucy.ai/near/projects', { method: 'POST' }))
+		);
+		return new Response(null, { status: 204 });
 	});
 
 export async function updateNearKnowledge(env: EnvBindings, ctx: ExecutionContext) {

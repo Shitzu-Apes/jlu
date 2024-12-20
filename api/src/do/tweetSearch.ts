@@ -4,11 +4,11 @@ import { Hono, type Env } from 'hono';
 import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
+import type { EngageableTweet, TweetSearchResponse } from '../definitions';
 import { generateImage } from '../leonardo';
 import { twitterRequest } from '../oauth1';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
-import type { EngageableTweet, TweetSearchResponse } from '../tweet_types';
 
 const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
@@ -88,7 +88,7 @@ const Queries: Record<
 > = {
 	ai_agents: {
 		query:
-			'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing is:verified lang:en',
+			'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts is:verified lang:en',
 		pullThread: true,
 		maxResults: 10,
 		minImpressions: 25,
@@ -98,7 +98,7 @@ const Queries: Record<
 	},
 	near: {
 		query:
-			'("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu" OR nearprotocol OR "near da" OR nightshade) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
+			'("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu" OR nearprotocol OR "near da") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
 		pullThread: true,
 		maxResults: 10,
 		minImpressions: 10,
@@ -220,21 +220,24 @@ export class TweetSearch extends DurableObject {
 
 				if (tweet.lucyTweets == null) {
 					console.log('[generating lucy tweets]');
-					const nearTweetSummary = await this.env.KV.get('nearTweetSummary');
+
 					const messages = [{ role: 'system', content: LUCY_PROMPT }];
-					if (nearTweetSummary) {
-						messages.push({
-							role: 'system',
-							content: `This is your knowledge about important tweets from the Near ecosystem:\n\n${nearTweetSummary}`
-						});
-					}
-					const nearweekNewsletters = await this.env.KV.get('nearweekNewsletters');
-					if (nearweekNewsletters) {
-						messages.push({
-							role: 'system',
-							content: `This is your knowledge about important newsletters from the Near ecosystem:\n\n${nearweekNewsletters}`
-						});
-					}
+					// TODO use new knowledge
+					// const nearTweetSummary = await this.env.KV.get('nearTweetSummary');
+					// if (nearTweetSummary) {
+					// 	messages.push({
+					// 		role: 'system',
+					// 		content: `This is your knowledge about important tweets from the Near ecosystem:\n\n${nearTweetSummary}`
+					// 	});
+					// }
+					// const nearweekNewsletters = await this.env.KV.get('nearweekNewsletters');
+					// if (nearweekNewsletters) {
+					// 	messages.push({
+					// 		role: 'system',
+					// 		content: `This is your knowledge about important newsletters from the Near ecosystem:\n\n${nearweekNewsletters}`
+					// 	});
+					// }
+
 					messages.push({ role: 'user', content: tweet.tweet.text });
 
 					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {

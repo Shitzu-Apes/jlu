@@ -2,8 +2,8 @@ import { Hono, type Env } from 'hono';
 
 import type { EnvBindings } from '../types';
 
+import type { TweetSearchData, TweetSearchResponse } from './definitions';
 import type { Tweet } from './do/tweets';
-import type { TweetSearchData, TweetSearchResponse } from './tweet_types';
 
 export const tweet = new Hono<Env>()
 	.get('/history', async (c) => {

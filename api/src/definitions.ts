@@ -65,12 +65,52 @@ export type TweetKnowledge = {
 	thread?: string[];
 };
 
-export const NearweekNewsletterResponse = z.object({
-	summary: z.array(z.string()),
-	date: z.string()
-});
-export type NearweekNewsletterResponse = z.infer<typeof NearweekNewsletterResponse>;
+export const KnowledgeCategory = z.enum([
+	'defi',
+	'gaming',
+	'nft',
+	'social',
+	'security',
+	'ethereum',
+	'solana',
+	'near',
+	'bitcoin',
+	'sui',
+	'ai',
+	'funding',
+	'development',
+	'chain_abstraction',
+	'event',
+	'meme'
+]);
+export type KnowledgeCategory = z.infer<typeof KnowledgeCategory>;
 
-export type NearweekNewsletter = {
-	link: string;
-} & NearweekNewsletterResponse;
+export const NearProjects = z.object({
+	id: z.string(),
+	name: z.string(),
+	description: z.string().optional(),
+	links: z
+		.object({
+			dapp: z.string().optional(),
+			website: z.string().optional(),
+			twitter: z.string().optional(),
+			discord: z.string().optional(),
+			telegram: z.string().optional(),
+			github: z.string().optional(),
+			medium: z.string().optional()
+		})
+		.optional()
+});
+export type NearProjects = z.infer<typeof NearProjects>;
+
+export const KnowledgePiece = z.object({
+	created_at: z.string(),
+	text: z.string(),
+	categories: z.array(KnowledgeCategory),
+	projects: z.array(z.string()),
+	importance: z.number()
+});
+export type KnowledgePiece = z.infer<typeof KnowledgePiece>;
+
+export const KnowledgePieces = z.object({ pieces: z.array(KnowledgePiece) });
+export type KnowledgePieces = z.infer<typeof KnowledgePieces>;
