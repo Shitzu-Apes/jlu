@@ -9,6 +9,7 @@ import { generateImage } from '../leonardo';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
+import { pullThread } from '../tweet';
 
 const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
@@ -269,14 +270,14 @@ export class TweetSearch extends DurableObject {
 							author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
 						}
 					}));
+				if (Queries[query].pullThread) {
+					for (const tweet of filteredTweets) {
+						const thread = await pullThread(tweet.tweet, this.env);
+						tweet.thread = thread;
+					}
+				}
 
 				// TODO store in KV knowledge
-				// if (Queries[query].pullThread) {
-				// 	for (const tweet of filteredTweets) {
-				// 		const thread = await pullThread(tweet.tweet, this.env);
-				// 		tweet.thread = thread;
-				// 	}
-				// }
 
 				console.log('[filteredTweets]', JSON.stringify(filteredTweets, null, 2));
 
@@ -312,7 +313,10 @@ export class TweetSearch extends DurableObject {
 					// 	});
 					// }
 
-					messages.push({ role: 'user', content: tweet.tweet.text });
+					messages.push({
+						role: 'user',
+						content: `${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.join('\n\n')}` : ''}`
+					});
 
 					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
 						method: 'POST',
