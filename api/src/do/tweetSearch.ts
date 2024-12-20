@@ -64,6 +64,19 @@ Give me a JSON response including:
 
 Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response.`;
 
+const JLU_KNOWLEDGE = `Juicy Lucy is a Web3 project that combines entertainment, gamification, and blockchain rewards into a fun and accessible experience. At the heart of the project is Lucy, an AI-powered virtual personality designed to interact with users through engaging conversations and playful challenges.
+
+How It Works
+- Chat with Lucy: Users can participate in lighthearted and dynamic conversations with Lucy.
+- Earn Rewards: Interactions are scored, and points are converted into on-chain tokens.
+- Share & Engage: Moments with Lucy can be shared on platforms like X (formerly Twitter), building a community around the experience.
+- Juicy Lucy is more than just a game—it’s a creative way to explore the possibilities of blockchain and Web3. By integrating with the Near Protocol ecosystem, the project makes decentralized technology approachable and rewarding.
+
+Links:
+- Dapp: https://juicylucy.ai
+- Telegram: https://t.me/SimpsForLucy
+- Github: https://github.com/Shitzu-Apes/jlu`;
+
 const LucyResponse = z.object({
 	tweets: z.array(z.string()),
 	generate_image: z.boolean(),
@@ -322,6 +335,10 @@ export class TweetSearch extends DurableObject {
 							Output as a JSON array of objects with the following fields:
 							- categories: string array of categories selected from given list. You can only select these categories: ${KnowledgeCategory.options.join(', ')}
 							- projects: string array of project ids selected from given list. You can only select these projects: ${projectIds.replace(/,/g, ', ')}`
+						},
+						{
+							role: 'system' as const,
+							content: `You also know following things about Juicy Lucy:\n\n${JLU_KNOWLEDGE}`
 						}
 					];
 
