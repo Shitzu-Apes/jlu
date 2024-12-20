@@ -84,6 +84,20 @@ export async function scheduleTweet(env: EnvBindings, ctx: ExecutionContext) {
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/schedule')));
 }
 
+export async function searchReplies(env: EnvBindings, ctx: ExecutionContext) {
+	const tweets = env.TWEET_SEARCH.idFromName('tweets');
+	const tweetsDo = env.TWEET_SEARCH.get(tweets);
+
+	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/replies')));
+}
+
+export async function searchMentions(env: EnvBindings, ctx: ExecutionContext) {
+	const tweets = env.TWEET_SEARCH.idFromName('tweets');
+	const tweetsDo = env.TWEET_SEARCH.get(tweets);
+
+	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/mentions')));
+}
+
 export async function searchAiAgentsTweets(env: EnvBindings, ctx: ExecutionContext) {
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);

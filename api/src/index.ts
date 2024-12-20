@@ -18,7 +18,9 @@ import {
 	processReplies,
 	scheduleTweet,
 	searchAiAgentsTweets,
+	searchMentions,
 	searchNearTweets,
+	searchReplies,
 	searchSimpsTweets,
 	tweet
 } from './tweet';
@@ -95,6 +97,9 @@ export default {
 				break;
 			case '* * * * *':
 				await Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]);
+				break;
+			case '*/10 * * * *':
+				await Promise.all([searchReplies(env, ctx), searchMentions(env, ctx)]);
 				break;
 			case '15 * * * *':
 				await searchAiAgentsTweets(env, ctx);

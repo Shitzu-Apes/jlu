@@ -74,7 +74,7 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-type Query = 'ai_agents' | 'near' | 'simps';
+type Query = 'ai_agents' | 'near' | 'simps' | 'replies';
 
 const Queries: Record<
 	Query,
@@ -86,6 +86,7 @@ const Queries: Record<
 		checkAuthor: boolean;
 		minFollowers: number;
 		minListedCount: number;
+		useCursor: boolean;
 	}
 > = {
 	ai_agents: {
@@ -96,7 +97,8 @@ const Queries: Record<
 		minImpressions: 25,
 		checkAuthor: true,
 		minFollowers: 50,
-		minListedCount: 5
+		minListedCount: 5,
+		useCursor: false
 	},
 	near: {
 		query:
@@ -106,7 +108,8 @@ const Queries: Record<
 		minImpressions: 10,
 		checkAuthor: true,
 		minFollowers: 25,
-		minListedCount: 0
+		minListedCount: 0,
+		useCursor: false
 	},
 	simps: {
 		query:
@@ -116,13 +119,31 @@ const Queries: Record<
 		minImpressions: 0,
 		checkAuthor: false,
 		minFollowers: 0,
-		minListedCount: 0
+		minListedCount: 0,
+		useCursor: false
+	},
+	replies: {
+		query: 'to:SimpsForLucy',
+		pullThread: true,
+		maxResults: 10,
+		minImpressions: 0,
+		checkAuthor: false,
+		minFollowers: 0,
+		minListedCount: 0,
+		useCursor: true
 	}
 };
 
 export class TweetSearch extends DurableObject {
 	private hono: Hono<Env>;
 	private tweets: EngageableTweet[] = [];
+	private mentionsCursor: string | null = null;
+	private cursors: Record<Query, string | null> = {
+		ai_agents: null,
+		near: null,
+		simps: null,
+		replies: null
+	};
 
 	constructor(
 		readonly state: DurableObjectState,
@@ -137,6 +158,50 @@ export class TweetSearch extends DurableObject {
 
 		this.hono = new Hono<Env>();
 		this.hono
+			.get('/search/mentions', async (c) => {
+				const searchParams = new URLSearchParams();
+				searchParams.set('query', 'to:SimpsForLucy');
+				searchParams.set('max_results', '10');
+				if (this.mentionsCursor != null) {
+					searchParams.set('since_id', this.mentionsCursor);
+				} else {
+					searchParams.set('start_time', dayjs().subtract(5, 'minutes').toISOString());
+				}
+				searchParams.set('user.fields', 'created_at,verified,description');
+				searchParams.set('expansions', 'author_id');
+				console.log('[searchParams]', searchParams.toString());
+				const res = await fetch(
+					`https://api.x.com/2/users/${c.env.TWITTER_LUCY_USER_ID}/mentions?${searchParams.toString()}`,
+					{
+						headers: {
+							Authorization: `Bearer ${c.env.TWITTER_BEARER_TOKEN}`
+						}
+					}
+				);
+				const tweets = await res.json<TweetSearchResponse>();
+
+				if (!tweets.data || tweets.data.length === 0) {
+					console.log('[no mentions]');
+					return c.json({ error: 'No tweets found' }, 404);
+				}
+
+				this.mentionsCursor = tweets.meta.newest_id;
+				await this.state.storage.put('mentionsCursor', this.mentionsCursor);
+
+				const filteredTweets: EngageableTweet[] = tweets.data.map((tweet) => ({
+					tweet: {
+						...tweet,
+						author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
+					}
+				}));
+
+				console.log('[tweets]', JSON.stringify(filteredTweets, null, 2));
+
+				this.tweets = [...this.tweets, ...filteredTweets];
+				await this.state.storage.put('tweets', this.tweets);
+
+				return new Response(null, { status: 204 });
+			})
 			.get('/search/:query', async (c) => {
 				const query = c.req.param('query') as Query;
 				if (!Queries[query]) {
@@ -147,8 +212,16 @@ export class TweetSearch extends DurableObject {
 				const searchParams = new URLSearchParams();
 				searchParams.set('query', Queries[query].query);
 				searchParams.set('max_results', Queries[query].maxResults.toString());
-				searchParams.set('start_time', dayjs().subtract(75, 'minutes').toISOString());
-				searchParams.set('end_time', dayjs().subtract(15, 'minutes').toISOString());
+				if (Queries[query].useCursor) {
+					if (this.cursors[query] != null) {
+						searchParams.set('since_id', this.cursors[query]);
+					} else {
+						searchParams.set('start_time', dayjs().subtract(5, 'minutes').toISOString());
+					}
+				} else {
+					searchParams.set('start_time', dayjs().subtract(75, 'minutes').toISOString());
+					searchParams.set('end_time', dayjs().subtract(15, 'minutes').toISOString());
+				}
 				searchParams.set('tweet.fields', 'public_metrics');
 				searchParams.set('user.fields', 'created_at,verified,public_metrics,description');
 				searchParams.set('expansions', 'author_id');
@@ -166,6 +239,11 @@ export class TweetSearch extends DurableObject {
 
 				if (!tweets.data || tweets.data.length === 0) {
 					return c.json({ error: 'No tweets found' }, 404);
+				}
+
+				if (Queries[query].useCursor) {
+					this.cursors[query] = tweets.meta.newest_id;
+					await this.state.storage.put('cursors', this.cursors);
 				}
 
 				const filteredTweets: EngageableTweet[] = tweets.data

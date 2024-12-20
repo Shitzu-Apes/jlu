@@ -42,6 +42,9 @@ export type TweetSearchResponse = {
 	includes: {
 		users: TweetSearchUser[];
 	};
+	meta: {
+		newest_id: string;
+	};
 };
 
 export type EngageableTweet = {
