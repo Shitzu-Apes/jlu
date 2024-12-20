@@ -260,7 +260,7 @@ export class Knowledge extends DurableObject {
 			}
 		];
 		const gpt4ores = await openai.beta.chat.completions.parse({
-			model: 'gpt-4o',
+			model: 'gpt-4o-mini',
 			messages,
 			response_format: zodResponseFormat(KnowledgePieces, 'knowledge_pieces')
 		});

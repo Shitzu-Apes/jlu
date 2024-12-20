@@ -254,7 +254,7 @@ export class Tweets extends DurableObject {
 					});
 					refinedMessages.push({ role: 'assistant', content: o1Response });
 					let gpt4ores = await openai.beta.chat.completions.parse({
-						model: 'gpt-4o',
+						model: 'gpt-4o-mini',
 						messages: refinedMessages,
 						response_format: zodResponseFormat(ScheduledTweetSchema, 'scheduled_tweet')
 					});
@@ -270,7 +270,7 @@ export class Tweets extends DurableObject {
 						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. ${localTime ? `The current actual local time is ${localTime}.` : `The current actual UTC time is ${new Date().toISOString()}.`} Your location is ${gpt4oResponse.location.city}, ${gpt4oResponse.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
 					});
 					gpt4ores = await openai.beta.chat.completions.parse({
-						model: 'gpt-4o',
+						model: 'gpt-4o-mini',
 						messages,
 						response_format: zodResponseFormat(ScheduledTweetSchema, 'scheduled_tweet')
 					});
