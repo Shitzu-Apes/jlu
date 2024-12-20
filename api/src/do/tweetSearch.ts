@@ -379,10 +379,13 @@ export class TweetSearch extends DurableObject {
 							tweetData.reply?.in_reply_to_tweet_id,
 							tweetData.media ? [tweetData.media] : undefined
 						);
-						console.log('[tweetResponse]', tweetResponse);
 
 						if (!tweetResponse.ok) {
-							console.error('Failed to send tweet', await tweetResponse.text());
+							console.error(
+								'Failed to send tweet',
+								tweetResponse.status,
+								await tweetResponse.text()
+							);
 							this.tweets.splice(0, 1);
 							await this.state.storage.put('tweets', this.tweets);
 							return c.json({ error: 'Failed to send tweet' }, 500);

@@ -32,6 +32,7 @@ interface EnvBindings {
 	TWITTER_PASSWORD: string;
 	TWITTER_EMAIL: string;
 	TWITTER_2FA_SECRET: string;
+	TWITTER_COOKIE?: string;
 }
 
 declare module 'hono' {

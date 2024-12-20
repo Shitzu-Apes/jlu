@@ -11,6 +11,10 @@ export async function getScraper(env: EnvBindings) {
 		? // eslint-disable-next-line @typescript-eslint/no-explicit-any
 			JSON.parse(cookiesString).map((cookie: any) => Cookie.fromJSON(cookie))
 		: [];
+	if (env.TWITTER_COOKIE && cookies.length === 0) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		cookies = JSON.parse(env.TWITTER_COOKIE).map((cookie: any) => Cookie.fromJSON(cookie));
+	}
 	if (cookies.length === 0) {
 		console.log('[login]');
 		await scraper.login(
@@ -26,7 +30,7 @@ export async function getScraper(env: EnvBindings) {
 		cookies = await scraper.getCookies();
 		console.log('[store cookies]', cookies);
 		await env.KV.put('twitter_cookies', JSON.stringify(cookies), {
-			expirationTtl: 60 * 60 * 24 * 14
+			expirationTtl: 60 * 60 * 24 * 365
 		});
 	} else {
 		console.log('[login via cookies]');
