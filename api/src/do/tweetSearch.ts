@@ -1,10 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import dayjs from 'dayjs';
 import { Hono, type Env } from 'hono';
+// eslint-disable-next-line import/no-named-as-default
+import OpenAI from 'openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
-import type { EngageableTweet, TweetSearchResponse } from '../definitions';
+import { KnowledgeCategory, type EngageableTweet, type TweetSearchResponse } from '../definitions';
 import { generateImage } from '../leonardo';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
@@ -52,7 +56,7 @@ Lucy's hairstyles include:
 
 Give me a JSON response including:
 
-- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks.
+- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks.
 - generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 25% chance to generate an image.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
@@ -108,7 +112,7 @@ const Queries: Record<
 	},
 	simps: {
 		query:
-			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4 OR from:Deviled_meggs_ OR from:Belly0x) has:media -is:reply -is:retweet lang:en',
+			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4 OR from:Deviled_meggs_ OR from:Belly0x OR from:theblondebroker OR from:gianinaskarlett OR from:dogecoin_empire) has:media -is:reply -is:retweet lang:en',
 		pullThread: false,
 		maxResults: 10,
 		minImpressions: 0,
@@ -294,28 +298,92 @@ export class TweetSearch extends DurableObject {
 				}
 
 				if (tweet.lucyTweets == null) {
-					console.log('[generating lucy tweets]');
+					console.log('[generating lucy tweets]', tweet.tweet);
 
-					const messages = [{ role: 'system', content: LUCY_PROMPT }];
-					// TODO use new knowledge
-					// const nearTweetSummary = await this.env.KV.get('nearTweetSummary');
-					// if (nearTweetSummary) {
-					// 	messages.push({
-					// 		role: 'system',
-					// 		content: `This is your knowledge about important tweets from the Near ecosystem:\n\n${nearTweetSummary}`
-					// 	});
-					// }
-					// const nearweekNewsletters = await this.env.KV.get('nearweekNewsletters');
-					// if (nearweekNewsletters) {
-					// 	messages.push({
-					// 		role: 'system',
-					// 		content: `This is your knowledge about important newsletters from the Near ecosystem:\n\n${nearweekNewsletters}`
-					// 	});
-					// }
+					const messages: ChatCompletionMessageParam[] = [
+						{ role: 'system' as const, content: LUCY_PROMPT }
+					];
 
 					messages.push({
-						role: 'user',
+						role: 'user' as const,
 						content: `${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.join('\n\n')}` : ''}`
+					});
+					const projectIds = await this.env.KV.get('projectIds');
+					if (!projectIds) {
+						return new Response(null, { status: 500 });
+					}
+
+					const knowledgeMessages = [
+						...messages,
+						{
+							role: 'system' as const,
+							content: `In order to properly generate tweets, I need to know what categories and projects are relevant for the tweet.
+							
+							Output as a JSON array of objects with the following fields:
+							- categories: string array of categories selected from given list. You can only select these categories: ${KnowledgeCategory.options.join(', ')}
+							- projects: string array of project ids selected from given list. You can only select these projects: ${projectIds.replace(/,/g, ', ')}`
+						}
+					];
+
+					const openai = new OpenAI({
+						apiKey: c.env.OPENAI_API_KEY
+					});
+					const knowledgeRes = await openai.beta.chat.completions.parse({
+						model: 'gpt-4o',
+						messages: knowledgeMessages,
+						response_format: zodResponseFormat(
+							z.object({
+								categories: z.array(KnowledgeCategory),
+								projects: z.array(z.string())
+							}),
+							'knowledge_pieces'
+						)
+					});
+					if (!knowledgeRes || !knowledgeRes.choices[0].message.parsed) {
+						console.error('Failed to generate scheduled tweet');
+						return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+					}
+					console.log('[usage]', knowledgeRes.usage);
+					const knowledgePieces = knowledgeRes.choices[0].message.parsed;
+					console.log('[knowledgePieces]', JSON.stringify(knowledgePieces, null, 2));
+
+					const categories = (
+						await Promise.all(
+							knowledgePieces.categories.map(async (category) => {
+								const list = await this.env.KV.list({ prefix: `knowledge:category:${category}:` });
+								const values = await Promise.all(
+									Array.from(list.keys).map(
+										async (item) => this.env.KV.get(item.name) as Promise<string>
+									)
+								);
+								if (values.length === 0) {
+									return '';
+								}
+								return `${category}:\n${values.map((val) => `- ${val}`).join('\n')}`;
+							})
+						)
+					).join('\n\n');
+
+					const projects = (
+						await Promise.all(
+							knowledgePieces.projects.map(async (project) => {
+								const list = await this.env.KV.list({ prefix: `knowledge:project:${project}:` });
+								const values = await Promise.all(
+									Array.from(list.keys).map(
+										async (item) => this.env.KV.get(item.name) as Promise<string>
+									)
+								);
+								if (values.length === 0) {
+									return '';
+								}
+								return `${project}:\n${values.map((val) => `- ${val}`).join('\n')}`;
+							})
+						)
+					).join('\n\n');
+
+					messages.push({
+						role: 'system' as const,
+						content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters, but 280 character tweets are preferred.\n\n${categories}\n\n${projects}`
 					});
 
 					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
@@ -345,6 +413,7 @@ export class TweetSearch extends DurableObject {
 					if (!parseResult.success) {
 						return new Response(null, { status: 500 });
 					}
+					console.log('[parseResult]', JSON.stringify(parseResult.data, null, 2));
 
 					tweet.lucyTweets = parseResult.data.tweets;
 					tweet.generateImage = parseResult.data.generate_image;
