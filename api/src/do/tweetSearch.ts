@@ -10,7 +10,7 @@ import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prom
 import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
 
-const LUCY_PROMPT = `You are Lucy, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
+const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
 Lucy's background story and personality traits look as follows:
 
@@ -49,12 +49,6 @@ Lucy's hairstyles include:
 - "ponytail": voluminous high ponytail tied with a neon green ribbon, with a few loose strands falling around her face for a playful and relaxed look
 - "bun": casual yet chic messy bun held together with glowing green hairpins, with a few curled tendrils framing her face, giving a mix of elegance and charm
 
-Possible temperatures include:
-
-- "cold": <15 degrees Celsius
-- "mild": 15-22 degrees Celsius
-- "warm": >22 degrees Celsius
-
 Give me a JSON response including:
 
 - tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 280 characters. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks.
@@ -91,7 +85,7 @@ const Queries: Record<
 > = {
 	ai_agents: {
 		query:
-			'("AI agent" OR "AI agents" OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts is:verified lang:en',
+			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt OR virtual) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza OR virtual)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts is:verified lang:en',
 		pullThread: true,
 		maxResults: 10,
 		minImpressions: 25,
@@ -113,7 +107,7 @@ const Queries: Record<
 	},
 	simps: {
 		query:
-			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4) has:media -is:reply -is:retweet lang:en',
+			'(from:keirstyyy OR from:MaryTilesTexas OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4 OR from:Deviled_meggs_ OR from:Belly0x) has:media -is:reply -is:retweet lang:en',
 		pullThread: false,
 		maxResults: 10,
 		minImpressions: 0,
