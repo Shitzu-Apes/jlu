@@ -44,6 +44,19 @@ export const knowledge = new Hono<Env>()
 		);
 		return new Response('', { status: 204 });
 	})
+	.delete('/near/tweets', async (c) => {
+		const auth = c.req.header('Authorization');
+		if (auth !== `Bearer ${c.env.TWITTER_BEARER_TOKEN}`) {
+			return c.text('Unauthorized', 401);
+		}
+
+		const knowledge = c.env.KNOWLEDGE.idFromName('knowledge');
+		const knowledgeDo = c.env.KNOWLEDGE.get(knowledge);
+		c.executionCtx.waitUntil(
+			knowledgeDo.fetch(new Request('https://api.juicylucy.ai/near/tweets', { method: 'DELETE' }))
+		);
+		return new Response('', { status: 204 });
+	})
 	.post('/near/nearweek', async (c) => {
 		const auth = c.req.header('Authorization');
 		if (auth !== `Bearer ${c.env.TWITTER_BEARER_TOKEN}`) {
