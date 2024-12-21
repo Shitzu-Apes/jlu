@@ -166,6 +166,13 @@ export class TweetSearch extends DurableObject {
 
 		this.state.blockConcurrencyWhile(async () => {
 			this.tweets = (await this.state.storage.get('tweets')) ?? [];
+			this.mentionsCursor = (await this.state.storage.get('mentionsCursor')) ?? null;
+			this.cursors = (await this.state.storage.get('cursors')) ?? {
+				ai_agents: null,
+				near: null,
+				simps: null,
+				replies: null
+			};
 		});
 
 		this.hono = new Hono<Env>();
@@ -173,6 +180,7 @@ export class TweetSearch extends DurableObject {
 			.get('/search/mentions', async (c) => {
 				const searchParams = new URLSearchParams();
 				searchParams.set('max_results', '10');
+				console.log('this.mentionsCursor', this.mentionsCursor);
 				if (this.mentionsCursor != null) {
 					searchParams.set('since_id', this.mentionsCursor);
 				} else {

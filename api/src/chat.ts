@@ -573,6 +573,9 @@ export const chat = new Hono<Env>()
 			points: number;
 			evaluation: string;
 		}>();
+		if (points == null) {
+			return c.text('Something went wrong', 500);
+		}
 
 		// Create thread from user's account
 		const tweetId = await sendTweet(
