@@ -172,12 +172,11 @@ export class TweetSearch extends DurableObject {
 		this.hono
 			.get('/search/mentions', async (c) => {
 				const searchParams = new URLSearchParams();
-				searchParams.set('query', 'to:SimpsForLucy');
 				searchParams.set('max_results', '10');
 				if (this.mentionsCursor != null) {
 					searchParams.set('since_id', this.mentionsCursor);
 				} else {
-					searchParams.set('start_time', dayjs().subtract(5, 'minutes').toISOString());
+					searchParams.set('start_time', dayjs().subtract(1, 'hour').toISOString());
 				}
 				searchParams.set('user.fields', 'created_at,verified,description');
 				searchParams.set('expansions', 'author_id');
@@ -200,12 +199,21 @@ export class TweetSearch extends DurableObject {
 				this.mentionsCursor = tweets.meta.newest_id;
 				await this.state.storage.put('mentionsCursor', this.mentionsCursor);
 
-				const filteredTweets: EngageableTweet[] = tweets.data.map((tweet) => ({
-					tweet: {
-						...tweet,
-						author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
-					}
-				}));
+				const filteredTweets: EngageableTweet[] = tweets.data
+					.filter(
+						(tweet) =>
+							!(
+								tweet.text.toLowerCase().includes('claim') &&
+								tweet.text.toLowerCase().includes('eligible')
+							) && !tweet.text.includes("Lucy's Evaluation")
+					)
+					.filter((tweet) => !this.tweets.some((t) => t.tweet.id === tweet.id))
+					.map((tweet) => ({
+						tweet: {
+							...tweet,
+							author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
+						}
+					}));
 
 				console.log('[tweets]', JSON.stringify(filteredTweets, null, 2));
 
@@ -281,6 +289,7 @@ export class TweetSearch extends DurableObject {
 							author.public_metrics.listed_count >= Queries[query].minListedCount
 						);
 					})
+					.filter((tweet) => !this.tweets.some((t) => t.tweet.id === tweet.id))
 					.map((tweet) => ({
 						tweet: {
 							...tweet,
