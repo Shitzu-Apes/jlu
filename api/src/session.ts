@@ -14,8 +14,12 @@ export async function getLucySession(c: Context<Env>): Promise<Auth | Response> 
 
 	let auth = (await response.json()) as Auth;
 
-	// Check if token is expired
-	if (Date.now() + 60_000 >= auth.expires_at) {
+	if (Date.now() >= auth.expires_at) {
+		return c.text('Lucy session expired', 401);
+	}
+
+	// check if should refresh
+	if (Date.now() + 1_000 * 60 * 60 >= auth.expires_at) {
 		const basicAuth = btoa(`${c.env.TWITTER_CLIENT_ID}:${c.env.TWITTER_CLIENT_SECRET}`);
 
 		console.log('[refresh] Attempting token refresh for Lucy');
