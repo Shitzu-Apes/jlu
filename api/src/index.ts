@@ -18,9 +18,8 @@ import {
 	processReplies,
 	scheduleTweet,
 	searchAiAgentsTweets,
-	searchMentions,
+	scrapeLucy,
 	searchNearTweets,
-	searchReplies,
 	searchSimpsTweets,
 	tweet
 } from './tweet';
@@ -98,8 +97,8 @@ export default {
 			case '* * * * *':
 				await Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]);
 				break;
-			case '*/10 * * * *':
-				await Promise.all([searchReplies(env, ctx), searchMentions(env, ctx)]);
+			case '*/3 * * * *':
+				await scrapeLucy(env, ctx);
 				break;
 			case '15 * * * *':
 				await searchAiAgentsTweets(env, ctx);

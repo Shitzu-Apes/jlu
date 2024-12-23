@@ -1,3 +1,4 @@
+import { SearchMode } from 'agent-twitter-client-cf-workers';
 import { DurableObject } from 'cloudflare:workers';
 import dayjs from 'dayjs';
 import { Hono, type Env } from 'hono';
@@ -13,7 +14,7 @@ import { generateImage } from '../leonardo';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
-import { pullThread } from '../tweet';
+import { getAuthor, pullConversation, pullThread } from '../tweet';
 
 const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
 
@@ -62,7 +63,7 @@ Give me a JSON response including:
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 
-Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response.`;
+Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response. Your own X account is @SimpsForLucy.`;
 
 const JLU_KNOWLEDGE = `Juicy Lucy is a Web3 project that combines entertainment, gamification, and blockchain rewards into a fun and accessible experience. At the heart of the project is Lucy, an AI-powered virtual personality designed to interact with users through engaging conversations and playful challenges.
 
@@ -86,7 +87,7 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-type Query = 'ai_agents' | 'near' | 'simps' | 'replies';
+type Query = 'ai_agents' | 'near' | 'simps';
 
 const Queries: Record<
 	Query,
@@ -133,28 +134,26 @@ const Queries: Record<
 		minFollowers: 0,
 		minListedCount: 0,
 		useCursor: false
-	},
-	replies: {
-		query: 'to:SimpsForLucy',
-		pullThread: true,
-		maxResults: 10,
-		minImpressions: 0,
-		checkAuthor: false,
-		minFollowers: 0,
-		minListedCount: 0,
-		useCursor: true
 	}
+};
+
+type Scrape = 'lucy';
+
+const Scrapes: Record<Scrape, { query: string; maxResults: number }> = {
+	lucy: { query: '@SimpsForLucy', maxResults: 5 }
 };
 
 export class TweetSearch extends DurableObject {
 	private hono: Hono<Env>;
 	private tweets: EngageableTweet[] = [];
-	private mentionsCursor: string | null = null;
-	private cursors: Record<Query, string | null> = {
+	private scrapeCursors: Record<Scrape, string | null> = {
+		lucy: null
+	};
+
+	private queryCursors: Record<Query, string | null> = {
 		ai_agents: null,
 		near: null,
-		simps: null,
-		replies: null
+		simps: null
 	};
 
 	constructor(
@@ -166,67 +165,91 @@ export class TweetSearch extends DurableObject {
 
 		this.state.blockConcurrencyWhile(async () => {
 			this.tweets = (await this.state.storage.get('tweets')) ?? [];
-			this.mentionsCursor = (await this.state.storage.get('mentionsCursor')) ?? null;
-			this.cursors = (await this.state.storage.get('cursors')) ?? {
+			this.scrapeCursors = (await this.state.storage.get('scrapeCursors')) ?? {
+				lucy: null
+			};
+			this.queryCursors = (await this.state.storage.get('queryCursors')) ?? {
 				ai_agents: null,
 				near: null,
-				simps: null,
-				replies: null
+				simps: null
 			};
 		});
 
 		this.hono = new Hono<Env>();
 		this.hono
-			.get('/search/mentions', async (c) => {
-				const searchParams = new URLSearchParams();
-				searchParams.set('max_results', '10');
-				console.log('this.mentionsCursor', this.mentionsCursor);
-				if (this.mentionsCursor != null) {
-					searchParams.set('since_id', this.mentionsCursor);
-				} else {
-					searchParams.set('start_time', dayjs().subtract(1, 'hour').toISOString());
+			.get('/scrape/:scrape', async (c) => {
+				const scrape = c.req.param('scrape') as Scrape;
+				if (!Scrapes[scrape]) {
+					return c.json({ error: 'Invalid scrape' }, 400);
 				}
-				searchParams.set('user.fields', 'created_at,verified,description');
-				searchParams.set('expansions', 'author_id');
-				console.log('[searchParams]', searchParams.toString());
-				const res = await fetch(
-					`https://api.x.com/2/users/${c.env.TWITTER_LUCY_USER_ID}/mentions?${searchParams.toString()}`,
-					{
-						headers: {
-							Authorization: `Bearer ${c.env.TWITTER_BEARER_TOKEN}`
-						}
-					}
+				console.log('[scrape]', Scrapes[scrape]);
+
+				const scraper = await getScraper(this.env);
+				const tweets = await scraper.searchTweets(
+					Scrapes[scrape].query,
+					Scrapes[scrape].maxResults,
+					SearchMode.Latest
 				);
-				const tweets = await res.json<TweetSearchResponse>();
 
-				if (!tweets.data || tweets.data.length === 0) {
-					console.log('[no mentions]');
-					return c.json({ error: 'No tweets found' }, 404);
-				}
+				let newTweets = false;
+				for await (const tweet of tweets) {
+					if (
+						tweet.id == null ||
+						tweet.username == null ||
+						tweet.userId == null ||
+						tweet.username === 'SimpsForLucy'
+					) {
+						continue;
+					}
+					if (BigInt(tweet.id) <= BigInt(this.scrapeCursors[scrape] ?? '0')) {
+						break;
+					}
+					if (this.tweets.some((t) => t.tweet.id === tweet.id)) {
+						continue;
+					}
+					if (
+						(tweet.text?.toLowerCase().includes('claim') &&
+							tweet.text?.toLowerCase().includes('eligible')) ||
+						tweet.text?.includes("Lucy's Evaluation")
+					) {
+						continue;
+					}
 
-				this.mentionsCursor = tweets.meta.newest_id;
-				await this.state.storage.put('mentionsCursor', this.mentionsCursor);
+					let conversation: { id: string; text: string; author: string }[] = [];
+					if (tweet.inReplyToStatusId) {
+						conversation = await pullConversation(tweet.inReplyToStatusId, scraper, this.env);
+					}
+					const author = await getAuthor(tweet.userId, tweet.username, scraper, this.env);
 
-				const filteredTweets: EngageableTweet[] = tweets.data
-					.filter(
-						(tweet) =>
-							!(
-								tweet.text.toLowerCase().includes('claim') &&
-								tweet.text.toLowerCase().includes('eligible')
-							) && !tweet.text.includes("Lucy's Evaluation")
-					)
-					.filter((tweet) => !this.tweets.some((t) => t.tweet.id === tweet.id))
-					.map((tweet) => ({
+					const newTweet: EngageableTweet = {
 						tweet: {
-							...tweet,
-							author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
-						}
-					}));
-
-				console.log('[tweets]', JSON.stringify(filteredTweets, null, 2));
-
-				this.tweets = [...this.tweets, ...filteredTweets];
-				await this.state.storage.put('tweets', this.tweets);
+							id: tweet.id,
+							text: tweet.text ?? '',
+							author_id: tweet.userId ?? '',
+							created_at: new Date(tweet.timestamp ?? 0).toISOString() ?? '',
+							public_metrics: {
+								like_count: tweet.likes ?? 0,
+								reply_count: tweet.replies ?? 0,
+								retweet_count: tweet.retweets ?? 0,
+								quote_count: 0,
+								impression_count: 0
+							},
+							author
+						},
+						conversation
+					};
+					console.log('[scraped tweet]', JSON.stringify(newTweet, null, 2));
+					this.tweets.push(newTweet);
+					await c.env.KV.put(`tweet:${tweet.id}`, JSON.stringify(newTweet), {
+						expirationTtl: 60 * 60 * 24 * 3
+					});
+					this.scrapeCursors[scrape] = tweet.id;
+					newTweets = true;
+				}
+				if (newTweets) {
+					await this.state.storage.put('tweets', this.tweets);
+					await this.state.storage.put('scrapeCursors', this.scrapeCursors);
+				}
 
 				return new Response(null, { status: 204 });
 			})
@@ -241,8 +264,8 @@ export class TweetSearch extends DurableObject {
 				searchParams.set('query', Queries[query].query);
 				searchParams.set('max_results', Queries[query].maxResults.toString());
 				if (Queries[query].useCursor) {
-					if (this.cursors[query] != null) {
-						searchParams.set('since_id', this.cursors[query]);
+					if (this.queryCursors[query] != null) {
+						searchParams.set('since_id', this.queryCursors[query]);
 					} else {
 						searchParams.set('start_time', dayjs().subtract(5, 'minutes').toISOString());
 					}
@@ -270,8 +293,8 @@ export class TweetSearch extends DurableObject {
 				}
 
 				if (Queries[query].useCursor) {
-					this.cursors[query] = tweets.meta.newest_id;
-					await this.state.storage.put('cursors', this.cursors);
+					this.queryCursors[query] = tweets.meta.newest_id;
+					await this.state.storage.put('queryCursors', this.queryCursors);
 				}
 
 				const filteredTweets: EngageableTweet[] = tweets.data
@@ -310,6 +333,11 @@ export class TweetSearch extends DurableObject {
 						tweet.thread = thread;
 					}
 				}
+				const scraper = await getScraper(this.env);
+				for (const tweet of filteredTweets) {
+					const conversation = await pullConversation(tweet.tweet.id, scraper, this.env);
+					tweet.conversation = conversation;
+				}
 
 				// TODO store in KV knowledge
 
@@ -334,9 +362,11 @@ export class TweetSearch extends DurableObject {
 						{ role: 'system' as const, content: LUCY_PROMPT }
 					];
 
+					const content = `${tweet.conversation != null ? `${tweet.conversation.map((c) => `${c.author}: ${c.text}`).join('\n\n')}\n\n` : ''}${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
+					console.log('[content]', content);
 					messages.push({
 						role: 'user' as const,
-						content: `${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.join('\n\n')}` : ''}`
+						content
 					});
 					const projectIds = await this.env.KV.get('projectIds');
 					if (!projectIds) {

@@ -49,9 +49,24 @@ export type TweetSearchResponse = {
 
 export type EngageableTweet = {
 	tweet: TweetSearchData & {
-		author: TweetSearchUser;
+		author?: TweetSearchUser;
 	};
-	thread?: TweetSearchData[];
+	thread?: {
+		id: string;
+		text: string;
+		author: string;
+	}[];
+	conversation?: {
+		id: string;
+		text: string;
+		author: string;
+		thread?: {
+			id: string;
+			text: string;
+			author: string;
+		}[];
+	}[];
+	inReplyToStatusId?: string;
 	lucyTweets?: string[];
 	generateImage?: boolean;
 	imagePrompt?: string;

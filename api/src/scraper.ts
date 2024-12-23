@@ -17,6 +17,7 @@ export async function getScraper(env: EnvBindings) {
 	}
 	if (cookies.length === 0) {
 		console.log('[login]');
+		throw new Error("don't do this");
 		await scraper.login(
 			env.TWITTER_USERNAME,
 			env.TWITTER_PASSWORD,
