@@ -335,7 +335,10 @@ export class TweetSearch extends DurableObject {
 				}
 				const scraper = await getScraper(this.env);
 				for (const tweet of filteredTweets) {
-					const conversation = await pullConversation(tweet.tweet.id, scraper, this.env);
+					if (tweet.inReplyToStatusId == null) {
+						continue;
+					}
+					const conversation = await pullConversation(tweet.inReplyToStatusId, scraper, this.env);
 					tweet.conversation = conversation;
 				}
 
