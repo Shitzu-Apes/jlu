@@ -362,8 +362,18 @@ export class TweetSearch extends DurableObject {
 						{ role: 'system' as const, content: LUCY_PROMPT }
 					];
 
-					const content = `${tweet.conversation != null ? `${tweet.conversation.map((c) => `${c.author}: ${c.text}`).join('\n\n')}\n\n` : ''}${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
-					console.log('[content]', content);
+					messages.push({
+						role: 'system' as const,
+						content: 'Following is the conversation between you and the user(s).'
+					});
+					for (const c of tweet.conversation ?? []) {
+						if (c.author === 'SimpsForLucy') {
+							messages.push({ role: 'user' as const, content: c.text });
+						} else {
+							messages.push({ role: 'assistant' as const, content: `${c.author}: ${c.text}` });
+						}
+					}
+					const content = `@${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
 					messages.push({
 						role: 'user' as const,
 						content
