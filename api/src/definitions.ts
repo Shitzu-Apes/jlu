@@ -19,6 +19,7 @@ export type TweetSearchData = {
 		type: string;
 		id: string;
 	}[];
+	note_tweet?: { text: string };
 };
 
 export type TweetSearchUser = {

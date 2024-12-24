@@ -279,7 +279,7 @@ export class TweetSearch extends DurableObject {
 					searchParams.set('start_time', dayjs().subtract(75, 'minutes').toISOString());
 					searchParams.set('end_time', dayjs().subtract(15, 'minutes').toISOString());
 				}
-				searchParams.set('tweet.fields', 'public_metrics');
+				searchParams.set('tweet.fields', 'note_tweet,public_metrics');
 				searchParams.set('user.fields', 'created_at,verified,public_metrics,description');
 				searchParams.set('expansions', 'author_id');
 				const res = await fetch(
@@ -330,6 +330,7 @@ export class TweetSearch extends DurableObject {
 					.map((tweet) => ({
 						tweet: {
 							...tweet,
+							text: tweet.note_tweet?.text ?? tweet.text,
 							author: tweets.includes.users.find((user) => user.id === tweet.author_id)!
 						}
 					}));

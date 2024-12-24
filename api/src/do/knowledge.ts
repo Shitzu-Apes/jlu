@@ -12,7 +12,8 @@ import {
 	KnowledgeCategory,
 	KnowledgePieces,
 	NearProjects,
-	type TweetKnowledge
+	type TweetKnowledge,
+	type TweetSearchData
 } from '../definitions';
 import { getScraper } from '../scraper';
 import { getAuthor, pullThread } from '../tweet';
@@ -84,10 +85,7 @@ export class Knowledge extends DurableObject {
 					return new Response(null, { status: 500 });
 				}
 				const jsonRes = await res.json<{
-					data: (TweetKnowledge & {
-						referenced_tweets?: { type: string; id: string }[];
-						note_tweet?: { text: string };
-					})[];
+					data: TweetSearchData[];
 					includes: {
 						tweets: TweetKnowledge[];
 					};
@@ -105,7 +103,7 @@ export class Knowledge extends DurableObject {
 				const tweets: TweetKnowledge[] = [];
 				const scraper = await getScraper(this.env);
 				for (const tweet of data) {
-					const author = await getAuthor(tweet.author_id, tweet.username, scraper, this.env);
+					const author = await getAuthor(tweet.author_id, '', scraper, this.env);
 					if (tweet.note_tweet) {
 						tweets.push({
 							id: tweet.id,
@@ -147,7 +145,7 @@ export class Knowledge extends DurableObject {
 					tweets
 						.map(
 							(t) =>
-								`Tweet from ${t.author_id} (created: ${dayjs(t.created_at).format('YYYY-MM-DD')}):\n${t.text}${t.thread != null ? `\n${t.thread.join('\n')}` : ''}`
+								`Tweet from ${t.username} (created: ${dayjs(t.created_at).format('YYYY-MM-DD')}):\n${t.text}${t.thread != null ? `\n${t.thread.join('\n')}` : ''}`
 						)
 						.join('\n'),
 					c

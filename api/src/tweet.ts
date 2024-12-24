@@ -256,6 +256,9 @@ export async function getAuthor(
 	if (authorKV) {
 		author = JSON.parse(authorKV) as TweetSearchUser;
 	} else {
+		if (username === 'User' || !username) {
+			username = await scraper.getScreenNameByUserId(authorId);
+		}
 		const profile = await scraper.getProfile(username);
 		if (!profile) {
 			return;
