@@ -3,9 +3,30 @@ import { Hono } from 'hono';
 
 import type { EnvBindings } from '../types';
 
-import type { NearProjects } from './definitions';
+import { KnowledgeCategory, type NearProjects } from './definitions';
 
 export const knowledge = new Hono<Env>()
+	.get('/projects', async (c) => {
+		const projectIds = await c.env.KV.get('projectIds');
+		return c.json(projectIds);
+	})
+	.get('/categories', async (c) => {
+		return c.json(KnowledgeCategory.options);
+	})
+	.get('/project/:project', async (c) => {
+		const project = c.req.param('project');
+
+		const list = await c.env.KV.list({ prefix: `knowledge:project:${project}` });
+		const knowledge = await Promise.all(list.keys.map((key) => c.env.KV.get(key.name)));
+		return c.json(knowledge);
+	})
+	.get('/category/:category', async (c) => {
+		const category = c.req.param('category');
+
+		const list = await c.env.KV.list({ prefix: `knowledge:category:${category}` });
+		const knowledge = await Promise.all(list.keys.map((key) => c.env.KV.get(key.name)));
+		return c.json(knowledge);
+	})
 	.get('/near/projects', async (c) => {
 		const knowledge = c.env.KNOWLEDGE.idFromName('knowledge');
 		const knowledgeDo = c.env.KNOWLEDGE.get(knowledge);
