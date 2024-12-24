@@ -14,7 +14,8 @@ import {
 	NearProjects,
 	type TweetKnowledge
 } from '../definitions';
-import { pullThread } from '../tweet';
+import { getScraper } from '../scraper';
+import { getAuthor, pullThread } from '../tweet';
 
 export class Knowledge extends DurableObject {
 	private hono: Hono<Env>;
@@ -102,12 +103,15 @@ export class Knowledge extends DurableObject {
 				await this.state.storage.put('nearTweetLatestId', this.nearTweetLatestId);
 
 				const tweets: TweetKnowledge[] = [];
+				const scraper = await getScraper(this.env);
 				for (const tweet of data) {
+					const author = await getAuthor(tweet.author_id, tweet.username, scraper, this.env);
 					if (tweet.note_tweet) {
 						tweets.push({
 							id: tweet.id,
 							text: tweet.note_tweet.text,
 							author_id: tweet.author_id,
+							username: author?.username ?? 'User',
 							created_at: tweet.created_at
 						});
 					} else if (tweet.referenced_tweets) {
@@ -118,17 +122,20 @@ export class Knowledge extends DurableObject {
 							id: tweet.id,
 							text: tweet.text,
 							author_id: tweet.author_id,
+							username: author?.username ?? 'User',
 							created_at: tweet.created_at,
 							thread: thread?.map((t) => t.text)
 						});
 					}
 				}
 				for (const tweet of includes.tweets) {
+					const author = await getAuthor(tweet.author_id, tweet.username, scraper, this.env);
 					const thread = await pullThread(tweet, this.env);
 					tweets.push({
 						id: tweet.id,
 						text: tweet.text,
 						author_id: tweet.author_id,
+						username: author?.username ?? 'User',
 						created_at: tweet.created_at,
 						thread: thread?.map((t) => t.text)
 					});
@@ -140,7 +147,7 @@ export class Knowledge extends DurableObject {
 					tweets
 						.map(
 							(t) =>
-								`Tweet (created: ${dayjs(t.created_at).format('YYYY-MM-DD')}):\n${t.text}${t.thread != null ? `\n${t.thread.join('\n')}` : ''}`
+								`Tweet from ${t.author_id} (created: ${dayjs(t.created_at).format('YYYY-MM-DD')}):\n${t.text}${t.thread != null ? `\n${t.thread.join('\n')}` : ''}`
 						)
 						.join('\n'),
 					c
@@ -223,6 +230,11 @@ export class Knowledge extends DurableObject {
 				this.nearTweetLatestId = '';
 				await this.state.storage.delete('nearTweetLatestId');
 				return new Response(null, { status: 204 });
+			})
+			.delete('/near/nearweek', async () => {
+				this.nearweekLatestId = 0;
+				await this.state.storage.delete('nearweekLatestId');
+				return new Response(null, { status: 204 });
 			});
 	}
 
@@ -280,8 +292,8 @@ export class Knowledge extends DurableObject {
 			knowledgePieces.pieces.map(async (piece) => {
 				for (const project of piece.projects) {
 					await this.env.KV.put(
-						`knowledge:project:${project}:${simpleHash(piece.text)}`,
-						piece.text,
+						`knowledge:projectJSON:${project}:${simpleHash(piece.text)}`,
+						JSON.stringify(piece),
 						{
 							expirationTtl: 60 * 60 * 24 * 365 // 1 year
 						}
@@ -289,8 +301,8 @@ export class Knowledge extends DurableObject {
 				}
 				for (const category of piece.categories) {
 					await this.env.KV.put(
-						`knowledge:category:${category}:${simpleHash(piece.text)}`,
-						piece.text,
+						`knowledge:categoryJSON:${category}:${simpleHash(piece.text)}`,
+						JSON.stringify(piece),
 						{
 							expirationTtl: 60 * 60 * 24 * 365 // 1 year
 						}

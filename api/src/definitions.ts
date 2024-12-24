@@ -80,6 +80,7 @@ export type TweetKnowledge = {
 	id: string;
 	text: string;
 	author_id: string;
+	username: string;
 	created_at: string;
 	thread?: string[];
 };

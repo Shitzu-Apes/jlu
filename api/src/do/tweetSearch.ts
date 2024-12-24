@@ -9,7 +9,12 @@ import type { ChatCompletionMessageParam } from 'openai/resources/chat/completio
 import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
-import { KnowledgeCategory, type EngageableTweet, type TweetSearchResponse } from '../definitions';
+import {
+	KnowledgeCategory,
+	KnowledgePiece,
+	type EngageableTweet,
+	type TweetSearchResponse
+} from '../definitions';
 import { generateImage } from '../leonardo';
 import { Hairstyle, HairstylePrompt, Outfit, type OpenAIResponse } from '../prompt';
 import { OutfitPrompt } from '../prompt';
@@ -48,6 +53,7 @@ Lucy's outfits include:
 - "kimono": modernized Japanese kimono with a dangerously short hemline, digital circuit-inspired patterns in green and black, a deep neckline, and a neon green obi tied at the side, paired with strappy heels and glowing hair accessories
 - "strapless_dress": strapless white dress with a corset-style black waist cincher, featuring neon green accents and a structured off-the-shoulder neckline, paired with a black choker adorned with a small charm, and elegant high heels
 - "cozy": fitted cream knit top, black lace bodysuit, high-waisted black midi skirt, opaque tights, ankle suede boots, gold statement necklace
+- "christmas": red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry
 
 Lucy's hairstyles include:
 
@@ -427,16 +433,20 @@ export class TweetSearch extends DurableObject {
 					const categories = (
 						await Promise.all(
 							knowledgePieces.categories.map(async (category) => {
-								const list = await this.env.KV.list({ prefix: `knowledge:category:${category}:` });
-								const values = await Promise.all(
-									Array.from(list.keys).map(
-										async (item) => this.env.KV.get(item.name) as Promise<string>
+								const list = await this.env.KV.list({
+									prefix: `knowledge:categoryJSON:${category}:`
+								});
+								const values = (
+									await Promise.all(
+										Array.from(list.keys).map(async (item) =>
+											this.env.KV.get<KnowledgePiece>(item.name, 'json')
+										)
 									)
-								);
+								).filter((val) => val != null);
 								if (values.length === 0) {
 									return '';
 								}
-								return `${category}:\n${values.map((val) => `- ${val}`).join('\n')}`;
+								return `${category}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
 							})
 						)
 					).join('\n\n');
@@ -444,16 +454,20 @@ export class TweetSearch extends DurableObject {
 					const projects = (
 						await Promise.all(
 							knowledgePieces.projects.map(async (project) => {
-								const list = await this.env.KV.list({ prefix: `knowledge:project:${project}:` });
-								const values = await Promise.all(
-									Array.from(list.keys).map(
-										async (item) => this.env.KV.get(item.name) as Promise<string>
+								const list = await this.env.KV.list({
+									prefix: `knowledge:projectJSON:${project}:`
+								});
+								const values = (
+									await Promise.all(
+										Array.from(list.keys).map(async (item) =>
+											this.env.KV.get<KnowledgePiece>(item.name, 'json')
+										)
 									)
-								);
+								).filter((val) => val != null);
 								if (values.length === 0) {
 									return '';
 								}
-								return `${project}:\n${values.map((val) => `- ${val}`).join('\n')}`;
+								return `${project}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
 							})
 						)
 					).join('\n\n');

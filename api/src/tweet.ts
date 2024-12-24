@@ -251,7 +251,7 @@ export async function getAuthor(
 	scraper: Scraper,
 	env: EnvBindings
 ) {
-	const authorKV: string | null = await env.KV.get(`user:${authorId}`);
+	const authorKV: string | null = await env.KV.get(`author:${authorId}`);
 	let author: TweetSearchUser | null = null;
 	if (authorKV) {
 		author = JSON.parse(authorKV) as TweetSearchUser;
@@ -275,7 +275,7 @@ export async function getAuthor(
 				listed_count: profile.listedCount ?? 0
 			}
 		};
-		await env.KV.put(`user:${authorId}`, JSON.stringify(author), {
+		await env.KV.put(`author:${authorId}`, JSON.stringify(author), {
 			expirationTtl: 60 * 60 * 24 * 3
 		});
 	}

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 
 import type { EnvBindings } from '../types';
 
-import { KnowledgeCategory, type NearProjects } from './definitions';
+import { KnowledgeCategory, KnowledgePiece, type NearProjects } from './definitions';
 
 export const knowledge = new Hono<Env>()
 	.get('/projects', async (c) => {
@@ -16,15 +16,19 @@ export const knowledge = new Hono<Env>()
 	.get('/project/:project', async (c) => {
 		const project = c.req.param('project');
 
-		const list = await c.env.KV.list({ prefix: `knowledge:project:${project}` });
-		const knowledge = await Promise.all(list.keys.map((key) => c.env.KV.get(key.name)));
+		const list = await c.env.KV.list({ prefix: `knowledge:projectJSON:${project}` });
+		const knowledge = await Promise.all(
+			list.keys.map((key) => c.env.KV.get<KnowledgePiece>(key.name, 'json'))
+		);
 		return c.json(knowledge);
 	})
 	.get('/category/:category', async (c) => {
 		const category = c.req.param('category');
 
-		const list = await c.env.KV.list({ prefix: `knowledge:category:${category}` });
-		const knowledge = await Promise.all(list.keys.map((key) => c.env.KV.get(key.name)));
+		const list = await c.env.KV.list({ prefix: `knowledge:categoryJSON:${category}` });
+		const knowledge = await Promise.all(
+			list.keys.map((key) => c.env.KV.get<KnowledgePiece>(key.name, 'json'))
+		);
 		return c.json(knowledge);
 	})
 	.get('/near/projects', async (c) => {

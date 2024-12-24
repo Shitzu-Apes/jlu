@@ -35,7 +35,8 @@ export const Outfit = z.enum([
 	'hoodie',
 	'kimono',
 	'strapless_dress',
-	'cozy'
+	'cozy',
+	'christmas'
 ]);
 export type Outfit = z.infer<typeof Outfit>;
 
@@ -77,6 +78,11 @@ export const OutfitPrompt: Record<Outfit, Record<Temperature, string>> = {
 		cold: 'oversized cream knit sweater, black lace bodysuit, high-waisted black leggings, long camel wool coat, knee-high suede boots, chunky knit scarf, gold statement necklace',
 		mild: 'fitted cream knit top, black lace bodysuit, high-waisted black midi skirt, opaque tights, ankle suede boots, gold statement necklace',
 		warm: 'lightweight cream knit crop top, black lace bodysuit, black mini skirt, strappy black heels, delicate gold necklace'
+	},
+	christmas: {
+		cold: 'elegant red velvet dress with a fitted silhouette and midi-length skirt, paired with a white faux fur coat, black opaque tights, knee-high heeled boots, sparkling silver necklace',
+		mild: 'red satin slip dress with lace trim, cinched waist with a black belt, paired with a tailored black blazer, sheer black tights, heeled ankle boots, silver hoop earrings',
+		warm: 'red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry'
 	}
 };
 
