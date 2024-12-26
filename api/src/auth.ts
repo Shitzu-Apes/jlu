@@ -110,7 +110,11 @@ auth.get('/login/refresh', async (c) => {
 			})
 		});
 
-		const res = await handleTokenResponse(c, tokenResponse);
+		const userId = c.req.header('X-User-Id');
+		if (!userId) {
+			return c.text('No user ID provided', { status: 400 });
+		}
+		const res = await handleTokenResponse(userId, c, tokenResponse);
 		if (res instanceof Response) {
 			return res;
 		}
@@ -165,7 +169,7 @@ auth.get('/login', async (c) => {
 			})
 		});
 
-		const res = await handleTokenResponse(c, tokenResponse);
+		const res = await handleTokenResponse(null, c, tokenResponse);
 
 		if (res instanceof Response) {
 			return res;
@@ -231,7 +235,11 @@ async function handleTwitterResponse(
 	}
 }
 
-export async function handleTokenResponse(c: Context<Env>, tokenResponse: Response) {
+export async function handleTokenResponse(
+	userId: string | null,
+	c: Context<Env>,
+	tokenResponse: Response
+) {
 	const tokenError = await handleTwitterResponse(tokenResponse, 'token');
 	if (tokenError) return tokenError;
 
@@ -248,7 +256,6 @@ export async function handleTokenResponse(c: Context<Env>, tokenResponse: Respon
 
 	// Try to get user data from KV cache first
 	const kv = c.env.KV;
-	const userId = c.req.header('X-User-Id');
 	const cacheKey = userId ? `user:${userId}` : null;
 	const cachedUser = cacheKey
 		? await kv.get<{

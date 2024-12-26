@@ -36,7 +36,7 @@ export async function getLucySession(c: Context<Env>): Promise<Auth | Response> 
 			})
 		});
 
-		const res = await handleTokenResponse(c, tokenResponse);
+		const res = await handleTokenResponse(c.env.TWITTER_LUCY_USER_ID, c, tokenResponse);
 		if (res instanceof Response) {
 			return res;
 		}
