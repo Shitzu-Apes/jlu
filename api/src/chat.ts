@@ -621,7 +621,7 @@ export const chat = new Hono<Env>()
 		const session = c.get('session');
 
 		// Get user message from request body
-		const { message } = await c.req.json<{ message: string }>();
+		const { message, pastedInput } = await c.req.json<{ message: string; pastedInput: boolean }>();
 		if (!message) {
 			return c.text('Message is required', { status: 400 });
 		}
@@ -635,6 +635,17 @@ export const chat = new Hono<Env>()
 				},
 				{ status: 400 }
 			);
+		}
+
+		let pastedCount = (await c.env.KV.get<number>(`pasted-count:${session.user.id}`, 'json')) ?? 0;
+		if (pastedInput) {
+			pastedCount++;
+			await c.env.KV.put(`pasted-count:${session.user.id}`, JSON.stringify(pastedCount), {
+				expirationTtl: 60 * 60 * 12
+			});
+		}
+		if (pastedCount >= 3) {
+			return c.text('Your account has been flagged for using AI tooling.', { status: 403 });
 		}
 
 		// Get or create FlirtBattle DO for this user

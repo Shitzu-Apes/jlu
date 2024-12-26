@@ -9,6 +9,7 @@
 	import HowItWorks from './HowItWorks.svelte';
 	import type { LucyMood } from './Mood.svelte';
 	import Mood from './Mood.svelte';
+	import { showToast } from './Toast.svelte';
 	import XOauthButton from './XOauthButton.svelte';
 
 	import { fetchApi } from '$lib/api';
@@ -207,6 +208,7 @@
 	const MAX_MESSAGE_LENGTH = 200;
 	$: isMessageTooLong = (newMessage?.length ?? 0) > MAX_MESSAGE_LENGTH;
 
+	let pastedInput = false;
 	async function sendMessage() {
 		if (!newMessage.trim() || isLoading) return;
 
@@ -226,11 +228,13 @@
 		try {
 			const response = await fetchApi('/chat', {
 				method: 'POST',
-				body: { message: userMessageText }
+				body: { message: userMessageText, pastedInput }
 			});
 
 			if (!response.ok) {
-				console.error('Failed to send message:', await response.text());
+				const reason = await response.text();
+				showToast(reason);
+				console.error('Failed to send message:', reason);
 				return;
 			}
 
@@ -245,6 +249,7 @@
 			console.error('Error sending message:', err);
 		} finally {
 			isLoading = false;
+			pastedInput = false;
 		}
 	}
 
@@ -278,6 +283,13 @@
 		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
 			sendMessage();
+		}
+	}
+
+	function handlePaste(event: ClipboardEvent) {
+		const text = event.clipboardData?.getData('text');
+		if (text) {
+			pastedInput = true;
 		}
 	}
 
@@ -640,6 +652,7 @@
 									bind:value={newMessage}
 									bind:this={inputRef}
 									on:keydown={handleKeyDown}
+									on:paste={handlePaste}
 									disabled={isLoading || !canSendMessage}
 									class="w-full bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 min-w-0 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder:text-zinc-400 disabled:opacity-50 disabled:cursor-not-allowed {isMessageTooLong
 										? 'border-red-500'
