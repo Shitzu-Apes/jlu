@@ -614,6 +614,13 @@ export const chat = new Hono<Env>()
 
 		await sendJLU(walletAddress, points, c);
 
+		const userIp = c.req.header('cf-connecting-ip');
+		if (userIp) {
+			await c.env.KV.put(`user-ip:${userIp}`, session.user.id, {
+				expirationTtl: 60 * 60 * 3
+			});
+		}
+
 		const result = await claimResponse.json<FlirtBattleResponse>();
 		return c.json({ ...result, tweetUrl });
 	})
@@ -646,6 +653,14 @@ export const chat = new Hono<Env>()
 		}
 		if (pastedCount >= 3) {
 			return c.text('Your account has been flagged for using AI tooling.', { status: 403 });
+		}
+
+		const userIp = c.req.header('cf-connecting-ip');
+		if (userIp) {
+			const userId = await c.env.KV.get(`user-ip:${userIp}`);
+			if (userId && userId !== session.user.id) {
+				return c.text('Your account has been flagged for multi account usage.', { status: 403 });
+			}
 		}
 
 		// Get or create FlirtBattle DO for this user

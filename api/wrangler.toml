@@ -20,7 +20,7 @@ TWITTER_LUCY_USER_ID = "1861724864756822016"
 CEREBRAS_API_URL = "https://api.cerebras.ai"
 NEAR_ACCOUNT_ID = "juicylucy.near"
 JLU_TOKEN_ID = "jlu-1018.meme-cooking.near"
-JLU_PER_POINT = "30000000000000000000"
+JLU_PER_POINT = "25000000000000000000"
 
 [durable_objects]
 bindings = [
