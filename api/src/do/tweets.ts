@@ -50,9 +50,9 @@ Lucy's outfits include:
 - "evening_gown": elegant, backless evening gown with a high slit, blockchain-themed shimmering patterns, and a deep V-neck, paired with long gloves, sparkling earrings, and strappy heels
 - "hoodie": cropped white hoodie featuring the NEAR Protocol logo, worn with a barely-there black mini skirt, thigh-high white heeled boots, and a glowing green choker
 - "kimono": modernized Japanese kimono with a dangerously short hemline, digital circuit-inspired patterns in green and black, a deep neckline, and a neon green obi tied at the side, paired with strappy heels and glowing hair accessories
-- "strapless_dress": strapless white dress with a corset-style black waist cincher, featuring neon green accents and a structured off-the-shoulder neckline, paired with a black choker adorned with a small charm, and elegant high heels
+- "white_blouse": Lightweight white satin blouse with lace trim, tucked into a high-waisted mini skirt, strappy heels, delicate gold necklace
 - "cozy": fitted cream knit top, black lace bodysuit, high-waisted black midi skirt, opaque tights, ankle suede boots, gold statement necklace
-- "christmas": red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry
+- "red_dress": red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry
 
 Lucy's hairstyles include:
 
@@ -294,7 +294,7 @@ export class Tweets extends DurableObject {
 				if (this.currentTweet != null && this.currentTweet.imageGenerationId == null) {
 					console.log('[generating image]');
 					const res = await generateImage(
-						`female asian character, short dark purple hair, green eyes, realistic and curvy figure - ${OutfitPrompt[this.currentTweet.scheduledTweet.outfit][this.currentTweet.scheduledTweet.temperature]} - ${HairstylePrompt[this.currentTweet.scheduledTweet.hairstyle]} - ${this.currentTweet.scheduledTweet.image_prompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
+						`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[this.currentTweet.scheduledTweet.outfit][this.currentTweet.scheduledTweet.temperature]} - ${HairstylePrompt[this.currentTweet.scheduledTweet.hairstyle]} - ${this.currentTweet.scheduledTweet.image_prompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients - Beautiful Woman, Bare Chest, No Top, Full Body, Attractive, Revealing, shirtless, exposed body, unclothed, no clothes, stripped, unbuttoned, naughty, open legs, no pants, small breasts`,
 						this.env
 					);
 					if (!res.ok) {

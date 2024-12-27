@@ -34,9 +34,9 @@ export const Outfit = z.enum([
 	'evening_gown',
 	'hoodie',
 	'kimono',
-	'strapless_dress',
+	'white_blouse',
 	'cozy',
-	'christmas'
+	'red_dress'
 ]);
 export type Outfit = z.infer<typeof Outfit>;
 
@@ -69,17 +69,17 @@ export const OutfitPrompt: Record<Outfit, Record<Temperature, string>> = {
 		mild: 'modern Japanese kimono with short hemline, digital circuit-inspired patterns in green and black, neon green obi, black leggings, strappy heels, glowing hair accessories',
 		warm: 'modern Japanese kimono with dangerously short hemline, digital circuit-inspired patterns in green and black, deep neckline, neon green obi tied at the side, strappy heels, glowing hair accessories'
 	},
-	strapless_dress: {
-		cold: 'strapless white dress with black corset-style waist cincher, neon green accents, off-the-shoulder neckline, black long-sleeve bolero, black tights, black choker with charm, elegant high heels',
-		mild: 'strapless white dress with black corset-style waist cincher, neon green accents, structured off-the-shoulder neckline, black opaque tights, black choker with small charm, elegant high heels',
-		warm: 'strapless white dress with corset-style black waist cincher, neon green accents, structured off-the-shoulder neckline, black choker adorned with a small charm, elegant high heels'
+	white_blouse: {
+		cold: 'Sheer white lace blouse with intricate detailing, paired with a tailored long black wool coat, high-waisted skinny jeans, ankle boots, silver pendant necklace',
+		mild: 'Silk off-the-shoulder white blouse, layered with a cropped leather jacket, black pencil skirt with subtle shimmer, heeled ankle boots, statement earrings',
+		warm: 'Lightweight white satin blouse with lace trim, tucked into a high-waisted mini skirt, strappy heels, delicate gold necklace'
 	},
 	cozy: {
 		cold: 'oversized cream knit sweater, black lace bodysuit, high-waisted black leggings, long camel wool coat, knee-high suede boots, chunky knit scarf, gold statement necklace',
 		mild: 'fitted cream knit top, black lace bodysuit, high-waisted black midi skirt, opaque tights, ankle suede boots, gold statement necklace',
 		warm: 'lightweight cream knit crop top, black lace bodysuit, black mini skirt, strappy black heels, delicate gold necklace'
 	},
-	christmas: {
+	red_dress: {
 		cold: 'elegant red velvet dress with a fitted silhouette and midi-length skirt, paired with a white faux fur coat, black opaque tights, knee-high heeled boots, sparkling silver necklace',
 		mild: 'red satin slip dress with lace trim, cinched waist with a black belt, paired with a tailored black blazer, sheer black tights, heeled ankle boots, silver hoop earrings',
 		warm: 'red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry'
