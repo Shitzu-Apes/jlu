@@ -23,6 +23,16 @@
 		setTimeout(() => {
 			const url = new URL(window.location.href);
 
+			const error = url.searchParams.get('error');
+			if (error) {
+				showToast(error);
+				url.searchParams.delete('error');
+				url.searchParams.delete('state');
+				goto(url.href, { replaceState: true, noScroll: true });
+				$session$ = Promise.resolve(undefined);
+				return;
+			}
+
 			const state = url.searchParams.get('state');
 			const code = url.searchParams.get('code');
 			if (!state || !code) return;
