@@ -17,6 +17,7 @@ import {
 } from '../definitions';
 import { getScraper } from '../scraper';
 import { getAuthor, pullThread } from '../tweet';
+import { simpleHash } from '../utils';
 
 export class Knowledge extends DurableObject {
 	private hono: Hono<Env>;
@@ -310,12 +311,3 @@ export class Knowledge extends DurableObject {
 		);
 	}
 }
-
-const simpleHash = (str: string) => {
-	let hash = 0;
-	for (let i = 0; i < str.length; i++) {
-		const char = str.charCodeAt(i);
-		hash = (hash << 5) - hash + char;
-	}
-	return (hash >>> 0).toString(36).padStart(7, '0');
-};

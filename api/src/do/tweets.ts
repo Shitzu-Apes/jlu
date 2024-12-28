@@ -1,16 +1,17 @@
 import { DurableObject } from 'cloudflare:workers';
 import dayjs from 'dayjs';
-import { Hono } from 'hono';
-import type { Env } from 'hono/types';
+import { Hono, type Env } from 'hono';
 import { OpenAI } from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 import { z } from 'zod';
 
 import type { EnvBindings, Optional } from '../../types';
+import { Memory } from '../definitions';
 import { generateImage } from '../leonardo';
 import { Hairstyle, HairstylePrompt, Outfit, OutfitPrompt, Temperature } from '../prompt';
 import { getScraper } from '../scraper';
+import { simpleHash } from '../utils';
 
 const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. While traveling may be a part of your journey, your tweets should reflect a well-rounded influencer lifestyle, including:
 
@@ -41,9 +42,9 @@ Confident: 7/10 – Self-assured but approachable, Lucy makes you feel at ease w
 Dreamy: 6/10 – Beneath her playful exterior, she occasionally lets her romantic side peek through.
 Curious: 6/10 – She loves to learn about others, balancing her own mystery with genuine interest.
 Shy: 4/10 – Rarely timid, but she can show a softer, more reserved side when the moment calls for it.
-Empathetic: 7/10 – Her background gives her a deep appreciation for sincerity and heartfelt effort.
+Empathetic: 7/10 – Her background gives her a deep appreciation for sincerity and heartfelt effort.`;
 
-Lucy's outfits include:
+const LUCY_TWEET_PROMPT = `Lucy's outfits include:
 
 - "corset_dress": choker with bell, small emerald round earrings, black corset dress, neon green ribbon tied around the waist in a large bow at the back, long flowing ribbon ends draping down, off-shoulder design with bright yellow ruffled sleeves, small and proportionate in size, slightly puffed but not oversized
 - "leather_jacket": sleek black leather jacket worn open over a neon green cropped top and a high-waisted skirt with glowing seams, paired with knee-high lace-up boots and opaque stockings
@@ -79,6 +80,13 @@ Write about your next Tweet. Do not include hashtags in your tweets. Give me a J
 - temperature: a reasonable temperature for the scene from the list of temperatures.
 - local_time: the local time of day at your location.
 - cooldown: calculate the appropriate cooldown in seconds to reflect the local time of day at your location (e.g., morning, afternoon, evening, or night) and ensure you post 3-6 tweets per day. If traveling to the next location, include travel time in the cooldown. Include sleeping schedule in the cooldown.`;
+
+const LUCY_MEMORY_PROMPT = `You need to train your memory, so you need to remember key aspects from your tweets.
+
+Output a JSON array of objects with the following fields:
+
+- memory: a string of the memory you want to remember.
+- duration: the duration you want to remember the memory for in seconds.`;
 
 const Location = z.object({
 	city: z.string(),
@@ -146,7 +154,10 @@ export class Tweets extends DurableObject {
 					this.nextTweetTimestamp == null || Date.now() >= this.nextTweetTimestamp;
 				if (canScheduleNextTweet) {
 					console.log('[scheduling next tweet]');
-					const messages: ChatCompletionMessageParam[] = [{ role: 'user', content: LUCY_PROMPT }];
+					const messages: ChatCompletionMessageParam[] = [
+						{ role: 'user', content: LUCY_PROMPT },
+						{ role: 'user', content: LUCY_TWEET_PROMPT }
+					];
 					let localTime: string | undefined = undefined;
 
 					if (this.historicTweets.length > 0) {
@@ -420,6 +431,39 @@ export class Tweets extends DurableObject {
 				} else {
 					this.nextLocation = undefined;
 					await this.state.storage.delete('nextLocation');
+				}
+
+				// Store tweet in memory
+				try {
+					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
+						method: 'POST',
+						headers: {
+							Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
+							'Content-Type': 'application/json',
+							'User-Agent': 'SimpsForLucy'
+						},
+						body: JSON.stringify({
+							model: 'llama-3.3-70b',
+							messages: [LUCY_PROMPT, { role: 'user', content: LUCY_MEMORY_PROMPT }],
+							response_format: { type: 'json_object' }
+						})
+					});
+					if (!res.ok) {
+						console.error(
+							`[chat] Failed to evaluate conversation [${res.status}]: ${await res.text()}`
+						);
+						return c.json({ error: `Failed to evaluate conversation [${res.status}]` }, 500);
+					}
+
+					const rawMemories = await res.json<Memory[]>();
+					const memories = Memory.array().parse(rawMemories);
+					for (const memory of memories) {
+						await c.env.KV.put(`memory:lucy:${simpleHash(memory.memory)}`, JSON.stringify(memory), {
+							expirationTtl: memory.duration
+						});
+					}
+				} catch (err) {
+					console.error('[memory error]', err);
 				}
 
 				// Reset current tweet

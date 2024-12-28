@@ -135,3 +135,9 @@ export type KnowledgePiece = z.infer<typeof KnowledgePiece>;
 
 export const KnowledgePieces = z.object({ pieces: z.array(KnowledgePiece) });
 export type KnowledgePieces = z.infer<typeof KnowledgePieces>;
+
+export const Memory = z.object({
+	memory: z.string(),
+	duration: z.number()
+});
+export type Memory = z.infer<typeof Memory>;
