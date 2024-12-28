@@ -63,7 +63,7 @@ Lucy's hairstyles include:
 
 Give me a JSON response including:
 
-- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks.
+- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks. You can end the conversation by keeping this array empty. End the conversation, if you have nothing to say.
 - generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 25% chance to generate an image.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
@@ -506,6 +506,12 @@ export class TweetSearch extends DurableObject {
 						return new Response(null, { status: 500 });
 					}
 					console.log('[parseResult]', JSON.stringify(parseResult.data, null, 2));
+
+					if (parseResult.data.tweets.length === 0) {
+						this.tweets.splice(0, 1);
+						await this.state.storage.put('tweets', this.tweets);
+						return new Response(null, { status: 204 });
+					}
 
 					tweet.lucyTweets = parseResult.data.tweets;
 					tweet.generateImage = parseResult.data.generate_image;
