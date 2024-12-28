@@ -184,80 +184,85 @@ export class TweetSearch extends DurableObject {
 		this.hono = new Hono<Env>();
 		this.hono
 			.get('/scrape/:scrape', async (c) => {
-				const scrape = c.req.param('scrape') as Scrape;
-				if (!Scrapes[scrape]) {
-					return c.json({ error: 'Invalid scrape' }, 400);
-				}
-				console.log('[scrape]', Scrapes[scrape]);
+				try {
+					const scrape = c.req.param('scrape') as Scrape;
+					if (!Scrapes[scrape]) {
+						return c.json({ error: 'Invalid scrape' }, 400);
+					}
+					console.log('[scrape]', Scrapes[scrape]);
 
-				const scraper = await getScraper(this.env);
-				const tweets = await scraper.searchTweets(
-					Scrapes[scrape].query,
-					Scrapes[scrape].maxResults,
-					SearchMode.Latest
-				);
+					const scraper = await getScraper(this.env);
+					const tweets = await scraper.searchTweets(
+						Scrapes[scrape].query,
+						Scrapes[scrape].maxResults,
+						SearchMode.Latest
+					);
 
-				let newTweets = false;
-				for await (const tweet of tweets) {
-					if (
-						tweet.id == null ||
-						tweet.username == null ||
-						tweet.userId == null ||
-						tweet.username === 'SimpsForLucy'
-					) {
-						continue;
-					}
-					if (BigInt(tweet.id) <= BigInt(this.scrapeCursors[scrape] ?? '0')) {
-						break;
-					}
-					if (this.tweets.some((t) => t.tweet.id === tweet.id)) {
-						continue;
-					}
-					if (
-						(tweet.text?.toLowerCase().includes('claim') &&
-							tweet.text?.toLowerCase().includes('eligible')) ||
-						tweet.text?.includes("Lucy's Evaluation")
-					) {
-						continue;
-					}
+					let newTweets = false;
+					for await (const tweet of tweets) {
+						if (
+							tweet.id == null ||
+							tweet.username == null ||
+							tweet.userId == null ||
+							tweet.username === 'SimpsForLucy'
+						) {
+							continue;
+						}
+						if (BigInt(tweet.id) <= BigInt(this.scrapeCursors[scrape] ?? '0')) {
+							break;
+						}
+						if (this.tweets.some((t) => t.tweet.id === tweet.id)) {
+							continue;
+						}
+						if (
+							(tweet.text?.toLowerCase().includes('claim') &&
+								tweet.text?.toLowerCase().includes('eligible')) ||
+							tweet.text?.includes("Lucy's Evaluation")
+						) {
+							continue;
+						}
 
-					let conversation: { id: string; text: string; author: string }[] = [];
-					if (tweet.inReplyToStatusId) {
-						conversation = await pullConversation(tweet.inReplyToStatusId, scraper, this.env);
-					}
-					const author = await getAuthor(tweet.userId, tweet.username, scraper, this.env);
+						let conversation: { id: string; text: string; author: string }[] = [];
+						if (tweet.inReplyToStatusId) {
+							conversation = await pullConversation(tweet.inReplyToStatusId, scraper, this.env);
+						}
+						const author = await getAuthor(tweet.userId, tweet.username, scraper, this.env);
 
-					const newTweet: EngageableTweet = {
-						tweet: {
-							id: tweet.id,
-							text: tweet.text ?? '',
-							author_id: tweet.userId ?? '',
-							created_at: new Date(tweet.timestamp ?? 0).toISOString() ?? '',
-							public_metrics: {
-								like_count: tweet.likes ?? 0,
-								reply_count: tweet.replies ?? 0,
-								retweet_count: tweet.retweets ?? 0,
-								quote_count: 0,
-								impression_count: 0
+						const newTweet: EngageableTweet = {
+							tweet: {
+								id: tweet.id,
+								text: tweet.text ?? '',
+								author_id: tweet.userId ?? '',
+								created_at: new Date(tweet.timestamp ?? 0).toISOString() ?? '',
+								public_metrics: {
+									like_count: tweet.likes ?? 0,
+									reply_count: tweet.replies ?? 0,
+									retweet_count: tweet.retweets ?? 0,
+									quote_count: 0,
+									impression_count: 0
+								},
+								author
 							},
-							author
-						},
-						conversation
-					};
-					console.log('[scraped tweet]', JSON.stringify(newTweet, null, 2));
-					this.tweets.push(newTweet);
-					await c.env.KV.put(`tweet:${tweet.id}`, JSON.stringify(newTweet), {
-						expirationTtl: 60 * 60 * 24 * 3
-					});
-					this.scrapeCursors[scrape] = tweet.id;
-					newTweets = true;
-				}
-				if (newTweets) {
-					await this.state.storage.put('tweets', this.tweets);
-					await this.state.storage.put('scrapeCursors', this.scrapeCursors);
-				}
+							conversation
+						};
+						console.log('[scraped tweet]', JSON.stringify(newTweet, null, 2));
+						this.tweets.push(newTweet);
+						await c.env.KV.put(`tweet:${tweet.id}`, JSON.stringify(newTweet), {
+							expirationTtl: 60 * 60 * 24 * 3
+						});
+						this.scrapeCursors[scrape] = tweet.id;
+						newTweets = true;
+					}
+					if (newTweets) {
+						await this.state.storage.put('tweets', this.tweets);
+						await this.state.storage.put('scrapeCursors', this.scrapeCursors);
+					}
 
-				return new Response(null, { status: 204 });
+					return new Response(null, { status: 204 });
+				} catch (err) {
+					console.error('[scrape error]', err);
+					return c.text('Internal server error', 500);
+				}
 			})
 			.get('/search/:query', async (c) => {
 				const query = c.req.param('query') as Query;
@@ -359,201 +364,271 @@ export class TweetSearch extends DurableObject {
 				return new Response(null, { status: 204 });
 			})
 			.get('/replies', async (c) => {
-				const tweet = this.tweets[0];
+				try {
+					const tweet = this.tweets[0];
 
-				if (tweet == null) {
-					return new Response(null, { status: 204 });
-				}
-
-				if (tweet.lucyTweets == null) {
-					console.log('[generating lucy tweets]', tweet.tweet);
-
-					const messages: ChatCompletionMessageParam[] = [
-						{ role: 'system' as const, content: LUCY_PROMPT }
-					];
-
-					messages.push({
-						role: 'system' as const,
-						content: 'Following is the conversation between you and the user(s).'
-					});
-					for (const c of tweet.conversation ?? []) {
-						if (c.author === 'SimpsForLucy') {
-							messages.push({ role: 'user' as const, content: c.text });
-						} else {
-							messages.push({ role: 'assistant' as const, content: `${c.author}: ${c.text}` });
-						}
-					}
-					const content = `@${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
-					messages.push({
-						role: 'user' as const,
-						content
-					});
-					const projectIds = await this.env.KV.get('projectIds');
-					if (!projectIds) {
-						return new Response(null, { status: 500 });
-					}
-
-					const knowledgeMessages = [
-						...messages,
-						{
-							role: 'system' as const,
-							content: `In order to properly generate tweets, I need to know what categories and projects are relevant for the tweet.
-							
-							Output as a JSON array of objects with the following fields:
-							- categories: string array of categories selected from given list. You can only select these categories: ${KnowledgeCategory.options.join(', ')}
-							- projects: string array of project ids selected from given list. You can only select these projects: ${projectIds.replace(/,/g, ', ')}`
-						},
-						{
-							role: 'system' as const,
-							content: `You also know following things about Juicy Lucy:\n\n${JLU_KNOWLEDGE}`
-						}
-					];
-
-					const openai = new OpenAI({
-						apiKey: c.env.OPENAI_API_KEY
-					});
-					const knowledgeRes = await openai.beta.chat.completions.parse({
-						model: 'gpt-4o',
-						messages: knowledgeMessages,
-						response_format: zodResponseFormat(
-							z.object({
-								categories: z.array(KnowledgeCategory),
-								projects: z.array(z.string())
-							}),
-							'knowledge_pieces'
-						)
-					});
-					if (!knowledgeRes || !knowledgeRes.choices[0].message.parsed) {
-						console.error('Failed to generate scheduled tweet');
-						return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
-					}
-					console.log('[usage]', knowledgeRes.usage);
-					const knowledgePieces = knowledgeRes.choices[0].message.parsed;
-					console.log('[knowledgePieces]', JSON.stringify(knowledgePieces, null, 2));
-
-					const categories = (
-						await Promise.all(
-							knowledgePieces.categories.map(async (category) => {
-								const list = await this.env.KV.list({
-									prefix: `knowledge:categoryJSON:${category}:`
-								});
-								const values = (
-									await Promise.all(
-										Array.from(list.keys).map(async (item) =>
-											this.env.KV.get<KnowledgePiece>(item.name, 'json')
-										)
-									)
-								).filter((val) => val != null);
-								if (values.length === 0) {
-									return '';
-								}
-								return `${category}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
-							})
-						)
-					).join('\n\n');
-
-					const projects = (
-						await Promise.all(
-							knowledgePieces.projects.map(async (project) => {
-								const list = await this.env.KV.list({
-									prefix: `knowledge:projectJSON:${project}:`
-								});
-								const values = (
-									await Promise.all(
-										Array.from(list.keys).map(async (item) =>
-											this.env.KV.get<KnowledgePiece>(item.name, 'json')
-										)
-									)
-								).filter((val) => val != null);
-								if (values.length === 0) {
-									return '';
-								}
-								return `${project}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
-							})
-						)
-					).join('\n\n');
-
-					messages.push({
-						role: 'system' as const,
-						content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters, but 280 character tweets are preferred.\n\n${categories}\n\n${projects}`
-					});
-
-					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
-						method: 'POST',
-						headers: {
-							Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
-							'Content-Type': 'application/json',
-							'User-Agent': 'SimpsForLucy'
-						},
-						body: JSON.stringify({
-							model: 'llama-3.3-70b',
-							messages,
-							response_format: { type: 'json_object' }
-						})
-					});
-					if (!res.ok) {
-						console.error(
-							`[chat] Failed to evaluate conversation [${res.status}]: ${await res.text()}`
-						);
-						return c.json({ error: `Failed to evaluate conversation [${res.status}]` }, 500);
-					}
-					const completion = await res.json<OpenAIResponse>();
-
-					const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
-					const parseResult = LucyResponse.safeParse(rawResponse);
-
-					if (!parseResult.success) {
-						return new Response(null, { status: 500 });
-					}
-					console.log('[parseResult]', JSON.stringify(parseResult.data, null, 2));
-
-					if (parseResult.data.tweets.length === 0) {
-						this.tweets.splice(0, 1);
-						await this.state.storage.put('tweets', this.tweets);
+					if (tweet == null) {
 						return new Response(null, { status: 204 });
 					}
 
-					tweet.lucyTweets = parseResult.data.tweets;
-					tweet.generateImage = parseResult.data.generate_image;
-					tweet.imagePrompt = parseResult.data.image_prompt;
-					tweet.outfit = parseResult.data.outfit;
-					tweet.hairstyle = parseResult.data.hairstyle;
-					await this.state.storage.put('tweets', this.tweets);
-					console.log('[lucy tweets]', tweet.lucyTweets);
-					console.log('[generate_image]', tweet.generateImage);
-					console.log('[image prompt]', tweet.imagePrompt);
-					console.log('[outfit]', tweet.outfit);
-					console.log('[hairstyle]', tweet.hairstyle);
+					if (tweet.lucyTweets == null) {
+						console.log('[generating lucy tweets]', tweet.tweet);
 
-					return new Response(null, { status: 204 });
-				}
+						const messages: ChatCompletionMessageParam[] = [
+							{ role: 'system' as const, content: LUCY_PROMPT }
+						];
 
-				if (
-					tweet.imageGenerationId == null &&
-					tweet.imagePrompt != null &&
-					tweet.outfit != null &&
-					tweet.hairstyle != null
-				) {
-					const leoRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/me`, {
-						headers: {
-							Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
-							Accept: 'application/json'
-						}
-					});
-					const {
-						user_details: [
-							{
-								apiPaidTokens,
-								user: { id: leoUserId }
+						messages.push({
+							role: 'system' as const,
+							content: 'Following is the conversation between you and the user(s).'
+						});
+						for (const c of tweet.conversation ?? []) {
+							if (c.author === 'SimpsForLucy') {
+								messages.push({ role: 'user' as const, content: c.text });
+							} else {
+								messages.push({ role: 'assistant' as const, content: `${c.author}: ${c.text}` });
 							}
-						]
-					} = await leoRes.json<{
-						user_details: { apiPaidTokens: number; user: { id: string } }[];
-					}>();
-					if (apiPaidTokens < 2_000 || !tweet.generateImage) {
-						console.log('[using previous generations]');
-						const previousGenRes = await fetch(
-							`https://cloud.leonardo.ai/api/rest/v1/generations/user/${leoUserId}?offset=0&limit=500`,
+						}
+						const content = `@${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
+						messages.push({
+							role: 'user' as const,
+							content
+						});
+						const projectIds = await this.env.KV.get('projectIds');
+						if (!projectIds) {
+							return new Response(null, { status: 500 });
+						}
+
+						const knowledgeMessages = [
+							...messages,
+							{
+								role: 'system' as const,
+								content: `In order to properly generate tweets, I need to know what categories and projects are relevant for the tweet.
+								
+								Output as a JSON array of objects with the following fields:
+								- categories: string array of categories selected from given list. You can only select these categories: ${KnowledgeCategory.options.join(', ')}
+								- projects: string array of project ids selected from given list. You can only select these projects: ${projectIds.replace(/,/g, ', ')}`
+							},
+							{
+								role: 'system' as const,
+								content: `You also know following things about Juicy Lucy:\n\n${JLU_KNOWLEDGE}`
+							}
+						];
+
+						const openai = new OpenAI({
+							apiKey: c.env.OPENAI_API_KEY
+						});
+						const knowledgeRes = await openai.beta.chat.completions.parse({
+							model: 'gpt-4o',
+							messages: knowledgeMessages,
+							response_format: zodResponseFormat(
+								z.object({
+									categories: z.array(KnowledgeCategory),
+									projects: z.array(z.string())
+								}),
+								'knowledge_pieces'
+							)
+						});
+						if (!knowledgeRes || !knowledgeRes.choices[0].message.parsed) {
+							console.error('Failed to generate scheduled tweet');
+							return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+						}
+						console.log('[usage]', knowledgeRes.usage);
+						const knowledgePieces = knowledgeRes.choices[0].message.parsed;
+						console.log('[knowledgePieces]', JSON.stringify(knowledgePieces, null, 2));
+
+						const categories = (
+							await Promise.all(
+								knowledgePieces.categories.map(async (category) => {
+									const list = await this.env.KV.list({
+										prefix: `knowledge:categoryJSON:${category}:`
+									});
+									const values = (
+										await Promise.all(
+											Array.from(list.keys).map(async (item) =>
+												this.env.KV.get<KnowledgePiece>(item.name, 'json')
+											)
+										)
+									).filter((val) => val != null);
+									if (values.length === 0) {
+										return '';
+									}
+									return `${category}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
+								})
+							)
+						).join('\n\n');
+
+						const projects = (
+							await Promise.all(
+								knowledgePieces.projects.map(async (project) => {
+									const list = await this.env.KV.list({
+										prefix: `knowledge:projectJSON:${project}:`
+									});
+									const values = (
+										await Promise.all(
+											Array.from(list.keys).map(async (item) =>
+												this.env.KV.get<KnowledgePiece>(item.name, 'json')
+											)
+										)
+									).filter((val) => val != null);
+									if (values.length === 0) {
+										return '';
+									}
+									return `${project}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
+								})
+							)
+						).join('\n\n');
+
+						messages.push({
+							role: 'system' as const,
+							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters, but 280 character tweets are preferred.\n\n${categories}\n\n${projects}`
+						});
+
+						const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
+							method: 'POST',
+							headers: {
+								Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
+								'Content-Type': 'application/json',
+								'User-Agent': 'SimpsForLucy'
+							},
+							body: JSON.stringify({
+								model: 'llama-3.3-70b',
+								messages,
+								response_format: { type: 'json_object' }
+							})
+						});
+						if (!res.ok) {
+							console.error(
+								`[chat] Failed to evaluate conversation [${res.status}]: ${await res.text()}`
+							);
+							return c.json({ error: `Failed to evaluate conversation [${res.status}]` }, 500);
+						}
+						const completion = await res.json<OpenAIResponse>();
+
+						const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
+						const parseResult = LucyResponse.safeParse(rawResponse);
+
+						if (!parseResult.success) {
+							return new Response(null, { status: 500 });
+						}
+						console.log('[parseResult]', JSON.stringify(parseResult.data, null, 2));
+
+						if (parseResult.data.tweets.length === 0) {
+							this.tweets.splice(0, 1);
+							await this.state.storage.put('tweets', this.tweets);
+							return new Response(null, { status: 204 });
+						}
+
+						tweet.lucyTweets = parseResult.data.tweets;
+						tweet.generateImage = parseResult.data.generate_image;
+						tweet.imagePrompt = parseResult.data.image_prompt;
+						tweet.outfit = parseResult.data.outfit;
+						tweet.hairstyle = parseResult.data.hairstyle;
+						await this.state.storage.put('tweets', this.tweets);
+						console.log('[lucy tweets]', tweet.lucyTweets);
+						console.log('[generate_image]', tweet.generateImage);
+						console.log('[image prompt]', tweet.imagePrompt);
+						console.log('[outfit]', tweet.outfit);
+						console.log('[hairstyle]', tweet.hairstyle);
+
+						return new Response(null, { status: 204 });
+					}
+
+					if (
+						tweet.imageGenerationId == null &&
+						tweet.imagePrompt != null &&
+						tweet.outfit != null &&
+						tweet.hairstyle != null
+					) {
+						const leoRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/me`, {
+							headers: {
+								Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
+								Accept: 'application/json'
+							}
+						});
+						const {
+							user_details: [
+								{
+									apiPaidTokens,
+									user: { id: leoUserId }
+								}
+							]
+						} = await leoRes.json<{
+							user_details: { apiPaidTokens: number; user: { id: string } }[];
+						}>();
+						if (apiPaidTokens < 2_000 || !tweet.generateImage) {
+							console.log('[using previous generations]');
+							const previousGenRes = await fetch(
+								`https://cloud.leonardo.ai/api/rest/v1/generations/user/${leoUserId}?offset=0&limit=500`,
+								{
+									headers: {
+										Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
+										Accept: 'application/json'
+									}
+								}
+							);
+							const { generations: allGenerations } = await previousGenRes.json<{
+								generations: {
+									id: string;
+									status: string;
+									sdVersion: string;
+									scheduler: string;
+									presetStyle: string;
+									modelId: string;
+									generated_images: { id: string; url: string }[];
+								}[];
+							}>();
+							const generations = allGenerations.filter(
+								(gen) =>
+									gen.status === 'COMPLETE' &&
+									gen.sdVersion === 'SDXL_LIGHTNING' &&
+									gen.scheduler === 'LEONARDO' &&
+									gen.presetStyle === 'DYNAMIC' &&
+									gen.modelId === 'e71a1c2f-4f80-4800-934f-2c68979d8cc8'
+							);
+							const generation = generations[Math.floor(Math.random() * generations.length)];
+
+							if (!generation) {
+								console.error('No generation found');
+								return c.json({ error: 'No generation found' }, 500);
+							}
+
+							tweet.imageGenerationId = generation.id;
+							tweet.imageUrl = generation.generated_images[0].url;
+							await this.state.storage.put('tweets', this.tweets);
+							console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
+							console.log('[tweet.imageUrl]', tweet.imageUrl);
+							return new Response(null, { status: 204 });
+						}
+
+						console.log('[generating image]');
+						const res = await generateImage(
+							`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients - Beautiful Woman, Bare Chest, No Top, Full Body, Attractive, Revealing, shirtless, exposed body, unclothed, no clothes, stripped, unbuttoned, naughty, open legs, no pants, small breasts`,
+							this.env
+						);
+						if (!res.ok) {
+							console.error('Failed to generate image', res.status, await res.text());
+							return c.json({ error: 'Failed to generate image' }, 500);
+						}
+						const {
+							sdGenerationJob: { generationId }
+						} = await res.json<{ sdGenerationJob: { generationId: string } }>();
+						if (!generationId) {
+							console.error('Failed to generate image', res.status, await res.text());
+							return c.json({ error: 'Failed to generate image' }, 500);
+						}
+
+						tweet.imageGenerationId = generationId;
+						await this.state.storage.put('tweets', this.tweets);
+						console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
+
+						return new Response(null, { status: 204 });
+					}
+
+					if (tweet.imageUrl == null) {
+						console.log('[fetching image]');
+						const res = await fetch(
+							`https://cloud.leonardo.ai/api/rest/v1/generations/${tweet.imageGenerationId}`,
 							{
 								headers: {
 									Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
@@ -561,163 +636,98 @@ export class TweetSearch extends DurableObject {
 								}
 							}
 						);
-						const { generations: allGenerations } = await previousGenRes.json<{
-							generations: {
-								id: string;
-								status: string;
-								sdVersion: string;
-								scheduler: string;
-								presetStyle: string;
-								modelId: string;
-								generated_images: { id: string; url: string }[];
-							}[];
-						}>();
-						const generations = allGenerations.filter(
-							(gen) =>
-								gen.status === 'COMPLETE' &&
-								gen.sdVersion === 'SDXL_LIGHTNING' &&
-								gen.scheduler === 'LEONARDO' &&
-								gen.presetStyle === 'DYNAMIC' &&
-								gen.modelId === 'e71a1c2f-4f80-4800-934f-2c68979d8cc8'
-						);
-						const generation = generations[Math.floor(Math.random() * generations.length)];
-
-						if (!generation) {
-							console.error('No generation found');
-							return c.json({ error: 'No generation found' }, 500);
+						if (!res.ok) {
+							console.error('Failed to generate image', res.status, await res.text());
+							return c.json({ error: 'Failed to generate image' }, 500);
+						}
+						const {
+							generations_by_pk: { generated_images }
+						} = await res.json<{ generations_by_pk: { generated_images: { url: string }[] } }>();
+						if (!generated_images || generated_images.length === 0) {
+							console.error('Failed to generate image');
+							return c.json({ error: 'Failed to generate image' }, 500);
 						}
 
-						tweet.imageGenerationId = generation.id;
-						tweet.imageUrl = generation.generated_images[0].url;
+						tweet.imageUrl = generated_images[0].url;
 						await this.state.storage.put('tweets', this.tweets);
-						console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
 						console.log('[tweet.imageUrl]', tweet.imageUrl);
+
 						return new Response(null, { status: 204 });
 					}
 
-					console.log('[generating image]');
-					const res = await generateImage(
-						`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients - Beautiful Woman, Bare Chest, No Top, Full Body, Attractive, Revealing, shirtless, exposed body, unclothed, no clothes, stripped, unbuttoned, naughty, open legs, no pants, small breasts`,
-						this.env
-					);
-					if (!res.ok) {
-						console.error('Failed to generate image', res.status, await res.text());
-						return c.json({ error: 'Failed to generate image' }, 500);
+					console.log('[sending tweet]');
+					const imageResponse = await fetch(tweet.imageUrl);
+					if (!imageResponse.ok) {
+						console.error('Failed to download image');
+						return c.json({ error: 'Failed to download image' }, 500);
 					}
-					const {
-						sdGenerationJob: { generationId }
-					} = await res.json<{ sdGenerationJob: { generationId: string } }>();
-					if (!generationId) {
-						console.error('Failed to generate image', res.status, await res.text());
-						return c.json({ error: 'Failed to generate image' }, 500);
-					}
+					const imageBuffer = await imageResponse.arrayBuffer();
 
-					tweet.imageGenerationId = generationId;
-					await this.state.storage.put('tweets', this.tweets);
-					console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
-
-					return new Response(null, { status: 204 });
-				}
-
-				if (tweet.imageUrl == null) {
-					console.log('[fetching image]');
-					const res = await fetch(
-						`https://cloud.leonardo.ai/api/rest/v1/generations/${tweet.imageGenerationId}`,
-						{
-							headers: {
-								Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
-								Accept: 'application/json'
-							}
-						}
-					);
-					if (!res.ok) {
-						console.error('Failed to generate image', res.status, await res.text());
-						return c.json({ error: 'Failed to generate image' }, 500);
-					}
-					const {
-						generations_by_pk: { generated_images }
-					} = await res.json<{ generations_by_pk: { generated_images: { url: string }[] } }>();
-					if (!generated_images || generated_images.length === 0) {
-						console.error('Failed to generate image');
-						return c.json({ error: 'Failed to generate image' }, 500);
-					}
-
-					tweet.imageUrl = generated_images[0].url;
-					await this.state.storage.put('tweets', this.tweets);
-					console.log('[tweet.imageUrl]', tweet.imageUrl);
-
-					return new Response(null, { status: 204 });
-				}
-
-				console.log('[sending tweet]');
-				const imageResponse = await fetch(tweet.imageUrl);
-				if (!imageResponse.ok) {
-					console.error('Failed to download image');
-					return c.json({ error: 'Failed to download image' }, 500);
-				}
-				const imageBuffer = await imageResponse.arrayBuffer();
-
-				// Send tweets as a thread
-				let previousTweetId: string | undefined;
-				for (const tweetText of tweet.lucyTweets) {
-					const tweetData: {
-						text: string;
-						media?: { data: Buffer; mediaType: string };
-						reply?: { in_reply_to_tweet_id: string };
-					} = {
-						text: tweetText
-					};
-
-					// Add media to first tweet only
-					if (!previousTweetId) {
-						tweetData.media = {
-							data: Buffer.from(imageBuffer),
-							mediaType: 'image/jpeg'
+					// Send tweets as a thread
+					let previousTweetId: string | undefined;
+					for (const tweetText of tweet.lucyTweets) {
+						const tweetData: {
+							text: string;
+							media?: { data: Buffer; mediaType: string };
+							reply?: { in_reply_to_tweet_id: string };
+						} = {
+							text: tweetText
 						};
-						tweetData.reply = { in_reply_to_tweet_id: tweet.tweet.id };
-					} else {
-						// Add reply parameters if this is part of a thread
-						tweetData.reply = { in_reply_to_tweet_id: previousTweetId };
-					}
 
-					try {
-						const scraper = await getScraper(this.env);
-						const tweetResponse = await scraper.sendTweet(
-							tweetData.text,
-							tweetData.reply?.in_reply_to_tweet_id,
-							tweetData.media ? [tweetData.media] : undefined
-						);
+						// Add media to first tweet only
+						if (!previousTweetId) {
+							tweetData.media = {
+								data: Buffer.from(imageBuffer),
+								mediaType: 'image/jpeg'
+							};
+							tweetData.reply = { in_reply_to_tweet_id: tweet.tweet.id };
+						} else {
+							// Add reply parameters if this is part of a thread
+							tweetData.reply = { in_reply_to_tweet_id: previousTweetId };
+						}
 
-						if (!tweetResponse.ok) {
-							console.error(
-								'Failed to send tweet',
-								tweetResponse.status,
-								await tweetResponse.text()
+						try {
+							const scraper = await getScraper(this.env);
+							const tweetResponse = await scraper.sendTweet(
+								tweetData.text,
+								tweetData.reply?.in_reply_to_tweet_id,
+								tweetData.media ? [tweetData.media] : undefined
 							);
-							this.tweets.splice(0, 1);
-							await this.state.storage.put('tweets', this.tweets);
+
+							if (!tweetResponse.ok) {
+								console.error(
+									'Failed to send tweet',
+									tweetResponse.status,
+									await tweetResponse.text()
+								);
+								this.tweets.splice(0, 1);
+								await this.state.storage.put('tweets', this.tweets);
+								return c.json({ error: 'Failed to send tweet' }, 500);
+							}
+
+							const json = await tweetResponse.json<{
+								data?: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
+								errors?: unknown;
+							}>();
+							if (json.data?.create_tweet?.tweet_results?.result?.rest_id) {
+								previousTweetId = json.data.create_tweet.tweet_results.result.rest_id;
+							} else {
+								break;
+							}
+						} catch (error) {
+							console.error('[error]', error);
 							return c.json({ error: 'Failed to send tweet' }, 500);
 						}
-
-						const json = await tweetResponse.json<{
-							data?: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
-							errors?: unknown;
-						}>();
-						if (json.data?.create_tweet?.tweet_results?.result?.rest_id) {
-							previousTweetId = json.data.create_tweet.tweet_results.result.rest_id;
-						} else {
-							break;
-						}
-					} catch (error) {
-						console.error('[error]', error);
-						return c.json({ error: 'Failed to send tweet' }, 500);
 					}
+
+					this.tweets.splice(0, 1);
+					await this.state.storage.put('tweets', this.tweets);
+
+					return new Response(null, { status: 204 });
+				} catch (err) {
+					console.error('[replies error]', err);
+					return c.text('Internal server error', 500);
 				}
-
-				this.tweets.splice(0, 1);
-				await this.state.storage.put('tweets', this.tweets);
-
-				return new Response(null, { status: 204 });
 			});
 	}
 
