@@ -13,6 +13,7 @@ import type { EnvBindings } from '../types';
 import { auth } from './auth';
 import { chat } from './chat';
 import { knowledge, updateNearKnowledge } from './knowledge';
+import { memory } from './memory';
 import { getLucySession } from './session';
 import {
 	processReplies,
@@ -48,6 +49,7 @@ app.route('/auth', auth);
 app.route('/chat', chat);
 app.route('/tweet', tweet);
 app.route('/knowledge', knowledge);
+app.route('/memory', memory);
 
 app.post('/refresh', async (c) => {
 	console.log('Refreshing Lucy session');

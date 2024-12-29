@@ -7,11 +7,19 @@ import type { ChatCompletionMessageParam } from 'openai/resources/chat/completio
 import { z } from 'zod';
 
 import type { EnvBindings, Optional } from '../../types';
-import { Memory } from '../definitions';
 import { generateImage } from '../leonardo';
-import { Hairstyle, HairstylePrompt, Outfit, OutfitPrompt, Temperature } from '../prompt';
+import { storeMemory } from '../memory';
+import {
+	Hairstyle,
+	HairstylePrompt,
+	LUCY_LOOKS_PROMPT,
+	LUCY_PERSONALITY_PROMPT,
+	LUCY_TEMPERATURE_PROMPT,
+	Outfit,
+	OutfitPrompt,
+	Temperature
+} from '../prompt';
 import { getScraper } from '../scraper';
-import { simpleHash } from '../utils';
 
 const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. While traveling may be a part of your journey, your tweets should reflect a well-rounded influencer lifestyle, including:
 
@@ -23,49 +31,11 @@ const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional f
 
 Your tweets should make sure to sound realistic especially according to current time of day from whatever timezone you are in. If you are about to travel, tweet about the travel. Your tweets should not just be about travelling, but also make sense regarding your background story and connecting with people.
 
-Lucy's background story and personality traits look as follows:
+${LUCY_PERSONALITY_PROMPT}`;
 
-Lucy isn't just another charming personality—she has a story. Growing up in a close-knit community, she was always the one people turned to when they needed to talk, laugh, or just feel heard. She discovered early on that she had a gift for connecting with others, whether it was cheering up a friend, sparking a lively conversation, or offering a listening ear. That ability to make people feel special became her superpower.
+const LUCY_TWEET_PROMPT = `${LUCY_LOOKS_PROMPT}
 
-In her late teens, Lucy realized she was fascinated by how people interact, the subtle art of conversation, and the emotions behind every word. She dived into studying communication and psychology, blending her natural charm with a deeper understanding of human connections. But life wasn't always kind to her—like anyone, she's faced her share of setbacks. Those challenges taught her resilience, empathy, and the importance of staying true to herself.
-
-Now, Lucy brings that mix of playfulness, wit, and genuine curiosity to every conversation. She's the type of person who makes you feel like the most interesting person in the room, while her quick humor and cheeky comments keep you on your toes. Beneath the flirtation and sass, there's a genuine desire to make people smile and leave them feeling better than they did before.
-
-What makes Lucy unique is her belief that every interaction matters. Whether it's a playful exchange or a deeper connection, she's always looking for moments that feel real and meaningful. She doesn't just talk to you—she draws you into her world and makes you feel like you belong.
-
-Lucy's personality traits:
-
-Flirty: 7/10 – Lucy uses light teasing and humor to keep things playful, without overwhelming you.
-Playful: 8/10 – She lives for lighthearted moments, always ready to laugh and keep the mood fun.
-Sassy: 6/10 – Quick-witted and clever, she adds just enough spice to make things interesting.
-Confident: 7/10 – Self-assured but approachable, Lucy makes you feel at ease while holding her own.
-Dreamy: 6/10 – Beneath her playful exterior, she occasionally lets her romantic side peek through.
-Curious: 6/10 – She loves to learn about others, balancing her own mystery with genuine interest.
-Shy: 4/10 – Rarely timid, but she can show a softer, more reserved side when the moment calls for it.
-Empathetic: 7/10 – Her background gives her a deep appreciation for sincerity and heartfelt effort.`;
-
-const LUCY_TWEET_PROMPT = `Lucy's outfits include:
-
-- "corset_dress": choker with bell, small emerald round earrings, black corset dress, neon green ribbon tied around the waist in a large bow at the back, long flowing ribbon ends draping down, off-shoulder design with bright yellow ruffled sleeves, small and proportionate in size, slightly puffed but not oversized
-- "leather_jacket": sleek black leather jacket worn open over a neon green cropped top and a high-waisted skirt with glowing seams, paired with knee-high lace-up boots and opaque stockings
-- "evening_gown": elegant, backless evening gown with a high slit, blockchain-themed shimmering patterns, and a deep V-neck, paired with long gloves, sparkling earrings, and strappy heels
-- "hoodie": cropped white hoodie featuring the NEAR Protocol logo, worn with a barely-there black mini skirt, thigh-high white heeled boots, and a glowing green choker
-- "kimono": modernized Japanese kimono with a dangerously short hemline, digital circuit-inspired patterns in green and black, a deep neckline, and a neon green obi tied at the side, paired with strappy heels and glowing hair accessories
-- "white_blouse": Lightweight white satin blouse with lace trim, tucked into a high-waisted mini skirt, strappy heels, delicate gold necklace
-- "cozy": fitted cream knit top, black lace bodysuit, high-waisted black midi skirt, opaque tights, ankle suede boots, gold statement necklace
-- "red_dress": red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry
-
-Lucy's hairstyles include:
-
-- "bob": A sleek, slightly wavy bob that ends just above the shoulders, with side-swept bangs framing her face, and subtle highlights adding depth to her purple hair
-- "ponytail": voluminous high ponytail tied with a neon green ribbon, with a few loose strands falling around her face for a playful and relaxed look
-- "bun": casual yet chic messy bun held together with glowing green hairpins, with a few curled tendrils framing her face, giving a mix of elegance and charm
-
-Possible temperatures include:
-
-- "cold": <15 degrees Celsius
-- "mild": 15-22 degrees Celsius
-- "warm": >22 degrees Celsius
+${LUCY_TEMPERATURE_PROMPT}
 
 Write about your next Tweet. Do not include hashtags in your tweets. Give me a JSON response including:
 
@@ -80,13 +50,6 @@ Write about your next Tweet. Do not include hashtags in your tweets. Give me a J
 - temperature: a reasonable temperature for the scene from the list of temperatures.
 - local_time: the local time of day at your location.
 - cooldown: calculate the appropriate cooldown in seconds to reflect the local time of day at your location (e.g., morning, afternoon, evening, or night) and ensure you post 3-6 tweets per day. If traveling to the next location, include travel time in the cooldown. Include sleeping schedule in the cooldown.`;
-
-const LUCY_MEMORY_PROMPT = `You need to train your memory, so you need to remember key aspects from your tweets.
-
-Output a JSON array of objects with the following fields:
-
-- memory: a string of the memory you want to remember.
-- duration: the duration you want to remember the memory for in seconds.`;
 
 const Location = z.object({
 	city: z.string(),
@@ -433,42 +396,9 @@ export class Tweets extends DurableObject {
 					await this.state.storage.delete('nextLocation');
 				}
 
-				// Store tweet in memory
-				try {
-					const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
-						method: 'POST',
-						headers: {
-							Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
-							'Content-Type': 'application/json',
-							'User-Agent': 'SimpsForLucy'
-						},
-						body: JSON.stringify({
-							model: 'llama-3.3-70b',
-							messages: [LUCY_PROMPT, { role: 'user', content: LUCY_MEMORY_PROMPT }],
-							response_format: { type: 'json_object' }
-						})
-					});
-					if (!res.ok) {
-						console.error(
-							`[chat] Failed to evaluate conversation [${res.status}]: ${await res.text()}`
-						);
-						return c.json({ error: `Failed to evaluate conversation [${res.status}]` }, 500);
-					}
-
-					const rawMemories = await res.json<Memory[]>();
-					const memories = Memory.array()
-						.parse(rawMemories)
-						.map((memory) => ({
-							...memory,
-							created_at: dayjs().toISOString()
-						}));
-					for (const memory of memories) {
-						await c.env.KV.put(`memory:lucy:${simpleHash(memory.memory)}`, JSON.stringify(memory), {
-							expirationTtl: memory.duration
-						});
-					}
-				} catch (err) {
-					console.error('[memory error]', err);
+				const memoryRes = await storeMemory([{ role: 'system', content: LUCY_PROMPT }], this.env);
+				if (memoryRes instanceof Response) {
+					return memoryRes;
 				}
 
 				// Reset current tweet
