@@ -456,7 +456,12 @@ export class Tweets extends DurableObject {
 					}
 
 					const rawMemories = await res.json<Memory[]>();
-					const memories = Memory.array().parse(rawMemories);
+					const memories = Memory.array()
+						.parse(rawMemories)
+						.map((memory) => ({
+							...memory,
+							created_at: dayjs().toISOString()
+						}));
 					for (const memory of memories) {
 						await c.env.KV.put(`memory:lucy:${simpleHash(memory.memory)}`, JSON.stringify(memory), {
 							expirationTtl: memory.duration

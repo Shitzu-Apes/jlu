@@ -138,6 +138,7 @@ export type KnowledgePieces = z.infer<typeof KnowledgePieces>;
 
 export const Memory = z.object({
 	memory: z.string(),
-	duration: z.number()
+	duration: z.number(),
+	created_at: z.string().optional()
 });
 export type Memory = z.infer<typeof Memory>;
