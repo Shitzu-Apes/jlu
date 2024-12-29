@@ -21,7 +21,7 @@ import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
 import { getAuthor, pullConversation, pullThread } from '../tweet';
 
-const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are a reply bot and try to engage with a tweet.
+const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are especially bullish about yourself (ticket $JLU) and Shitzu Apes. You are a reply bot and try to engage with a tweet.
 
 Lucy's background story and personality traits look as follows:
 
@@ -69,7 +69,7 @@ Give me a JSON response including:
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 
-Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response. Your own X account is @SimpsForLucy.`;
+Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response. Your own X account is @SimpsForLucy. Don't take a user's tweet for granted and try to fact check it.`;
 
 const JLU_KNOWLEDGE = `Juicy Lucy is a Web3 project that combines entertainment, gamification, and blockchain rewards into a fun and accessible experience. At the heart of the project is Lucy, an AI-powered virtual personality designed to interact with users through engaging conversations and playful challenges.
 
@@ -132,7 +132,7 @@ const Queries: Record<
 	},
 	simps: {
 		query:
-			'(from:keirstyyy OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4 OR from:Deviled_meggs_ OR from:Belly0x OR from:theblondebroker OR from:gianinaskarlett OR from:dogecoin_empire) has:media -is:reply -is:retweet lang:en',
+			'(from:keirstyyy OR from:cecilia_hsueh OR from:defi_darling OR from:evcawolfCZ OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:melimeen OR from:summerxiris OR from:margot_eth OR from:xiaweb3 OR from:jademilady4 OR from:Deviled_meggs_ OR from:Belly0x OR from:theblondebroker OR from:gianinaskarlett OR from:dogecoin_empire OR from:melarin_the OR from:tima_malla) has:media -is:reply -is:retweet lang:en',
 		pullThread: false,
 		maxResults: 10,
 		minImpressions: 0,
@@ -384,9 +384,9 @@ export class TweetSearch extends DurableObject {
 						});
 						for (const c of tweet.conversation ?? []) {
 							if (c.author === 'SimpsForLucy') {
-								messages.push({ role: 'user' as const, content: c.text });
+								messages.push({ role: 'assistant' as const, content: c.text });
 							} else {
-								messages.push({ role: 'assistant' as const, content: `${c.author}: ${c.text}` });
+								messages.push({ role: 'system' as const, content: `${c.author}: ${c.text}` });
 							}
 						}
 						const content = `@${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
@@ -408,10 +408,6 @@ export class TweetSearch extends DurableObject {
 								Output as a JSON array of objects with the following fields:
 								- categories: string array of categories selected from given list. You can only select these categories: ${KnowledgeCategory.options.join(', ')}
 								- projects: string array of project ids selected from given list. You can only select these projects: ${projectIds.replace(/,/g, ', ')}`
-							},
-							{
-								role: 'system' as const,
-								content: `You also know following things about Juicy Lucy:\n\n${JLU_KNOWLEDGE}`
 							}
 						];
 
@@ -483,7 +479,12 @@ export class TweetSearch extends DurableObject {
 							role: 'system' as const,
 							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters, but 280 character tweets are preferred.\n\n${categories}\n\n${projects}`
 						});
+						messages.push({
+							role: 'system' as const,
+							content: `You also know following things about Juicy Lucy / $JLU / @SimpsForLucy:\n\n${JLU_KNOWLEDGE}`
+						});
 
+						console.log('[messages]', JSON.stringify(messages, null, 2));
 						const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
 							method: 'POST',
 							headers: {
@@ -519,19 +520,21 @@ export class TweetSearch extends DurableObject {
 							return new Response(null, { status: 204 });
 						}
 
-						tweet.lucyTweets = parseResult.data.tweets;
-						tweet.generateImage = parseResult.data.generate_image;
-						tweet.imagePrompt = parseResult.data.image_prompt;
-						tweet.outfit = parseResult.data.outfit;
-						tweet.hairstyle = parseResult.data.hairstyle;
-						await this.state.storage.put('tweets', this.tweets);
-						console.log('[lucy tweets]', tweet.lucyTweets);
-						console.log('[generate_image]', tweet.generateImage);
-						console.log('[image prompt]', tweet.imagePrompt);
-						console.log('[outfit]', tweet.outfit);
-						console.log('[hairstyle]', tweet.hairstyle);
-
 						return new Response(null, { status: 204 });
+
+						// tweet.lucyTweets = parseResult.data.tweets;
+						// tweet.generateImage = parseResult.data.generate_image;
+						// tweet.imagePrompt = parseResult.data.image_prompt;
+						// tweet.outfit = parseResult.data.outfit;
+						// tweet.hairstyle = parseResult.data.hairstyle;
+						// await this.state.storage.put('tweets', this.tweets);
+						// console.log('[lucy tweets]', tweet.lucyTweets);
+						// console.log('[generate_image]', tweet.generateImage);
+						// console.log('[image prompt]', tweet.imagePrompt);
+						// console.log('[outfit]', tweet.outfit);
+						// console.log('[hairstyle]', tweet.hairstyle);
+
+						// return new Response(null, { status: 204 });
 					}
 
 					if (
