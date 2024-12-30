@@ -471,43 +471,47 @@ export class TweetSearch extends DurableObject {
 								response_format: { type: 'json_object' }
 							})
 						});
+
+						let lucyResponse: LucyResponse;
 						if (!res.ok) {
-							console.error(
-								`[chat] Failed to evaluate conversation [${res.status}]: ${await res.text()}`
-							);
-							return c.json({ error: `Failed to evaluate conversation [${res.status}]` }, 500);
+							const gpt4ores = await openai.beta.chat.completions.parse({
+								model: 'gpt-4o-mini',
+								messages,
+								response_format: zodResponseFormat(LucyResponse, 'lucy_response')
+							});
+							if (!gpt4ores || !gpt4ores.choices[0].message.parsed) {
+								console.error('Failed to generate scheduled tweet');
+								return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+							}
+							console.log('[usage]', gpt4ores.usage);
+							lucyResponse = gpt4ores.choices[0].message.parsed;
+						} else {
+							const completion = await res.json<OpenAIResponse>();
+
+							const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
+							const parseResult = LucyResponse.safeParse(rawResponse);
+							if (!parseResult.success) {
+								return new Response(null, { status: 500 });
+							}
+
+							lucyResponse = parseResult.data;
 						}
-						const completion = await res.json<OpenAIResponse>();
+						console.log('[lucyResponse]', JSON.stringify(lucyResponse, null, 2));
 
-						const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
-						const parseResult = LucyResponse.safeParse(rawResponse);
-
-						if (!parseResult.success) {
-							return new Response(null, { status: 500 });
-						}
-						console.log('[parseResult]', JSON.stringify(parseResult.data, null, 2));
-
-						if (parseResult.data.tweets.length === 0) {
+						if (lucyResponse.tweets.length === 0) {
 							this.tweets.splice(0, 1);
 							await this.state.storage.put('tweets', this.tweets);
 							return new Response(null, { status: 204 });
 						}
 
+						tweet.lucyTweets = lucyResponse.tweets;
+						tweet.generateImage = lucyResponse.generate_image;
+						tweet.imagePrompt = lucyResponse.image_prompt;
+						tweet.outfit = lucyResponse.outfit;
+						tweet.hairstyle = lucyResponse.hairstyle;
+						await this.state.storage.put('tweets', this.tweets);
+
 						return new Response(null, { status: 204 });
-
-						// tweet.lucyTweets = parseResult.data.tweets;
-						// tweet.generateImage = parseResult.data.generate_image;
-						// tweet.imagePrompt = parseResult.data.image_prompt;
-						// tweet.outfit = parseResult.data.outfit;
-						// tweet.hairstyle = parseResult.data.hairstyle;
-						// await this.state.storage.put('tweets', this.tweets);
-						// console.log('[lucy tweets]', tweet.lucyTweets);
-						// console.log('[generate_image]', tweet.generateImage);
-						// console.log('[image prompt]', tweet.imagePrompt);
-						// console.log('[outfit]', tweet.outfit);
-						// console.log('[hairstyle]', tweet.hairstyle);
-
-						// return new Response(null, { status: 204 });
 					}
 
 					if (
