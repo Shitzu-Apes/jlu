@@ -450,7 +450,7 @@ export class TweetSearch extends DurableObject {
 
 						messages.push({
 							role: 'system' as const,
-							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters, but 280 character tweets are preferred.\n\n${categories}\n\n${projects}`
+							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters. You should however prefer 280 character tweets and only send longer tweets, if it's really necessary.\n\n${categories}\n\n${projects}`
 						});
 						messages.push({
 							role: 'system' as const,
@@ -668,11 +668,20 @@ export class TweetSearch extends DurableObject {
 
 						try {
 							const scraper = await getScraper(this.env);
-							const tweetResponse = await scraper.sendTweet(
-								tweetData.text,
-								tweetData.reply?.in_reply_to_tweet_id,
-								tweetData.media ? [tweetData.media] : undefined
-							);
+							let tweetResponse: Response;
+							if (tweetData.text.length > 280) {
+								tweetResponse = await scraper.sendLongTweet(
+									tweetData.text,
+									tweetData.reply?.in_reply_to_tweet_id,
+									tweetData.media ? [tweetData.media] : undefined
+								);
+							} else {
+								tweetResponse = await scraper.sendTweet(
+									tweetData.text,
+									tweetData.reply?.in_reply_to_tweet_id,
+									tweetData.media ? [tweetData.media] : undefined
+								);
+							}
 
 							if (!tweetResponse.ok) {
 								console.error(
@@ -689,6 +698,7 @@ export class TweetSearch extends DurableObject {
 								data?: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
 								errors?: unknown;
 							}>();
+							console.log('[tweetResponse]', JSON.stringify(json, null, 2));
 							if (json.data?.create_tweet?.tweet_results?.result?.rest_id) {
 								previousTweetId = json.data.create_tweet.tweet_results.result.rest_id;
 							} else {
