@@ -396,14 +396,14 @@ export class Tweets extends DurableObject {
 					await this.state.storage.delete('nextLocation');
 				}
 
+				// Reset current tweet
+				this.currentTweet = undefined;
+				await this.state.storage.delete('currentTweet');
+
 				const memoryRes = await storeMemory([{ role: 'system', content: LUCY_PROMPT }], this.env);
 				if (memoryRes instanceof Response) {
 					return memoryRes;
 				}
-
-				// Reset current tweet
-				this.currentTweet = undefined;
-				await this.state.storage.delete('currentTweet');
 
 				return new Response(null, { status: 204 });
 			})
