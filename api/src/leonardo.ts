@@ -9,7 +9,7 @@ export function generateImage(prompt: string, env: EnvBindings) {
 			Accept: 'application/json'
 		},
 		body: JSON.stringify({
-			alchemy: false,
+			alchemy: true,
 			height: 768,
 			modelId: 'e71a1c2f-4f80-4800-934f-2c68979d8cc8',
 			num_images: 1,
@@ -24,11 +24,15 @@ export function generateImage(prompt: string, env: EnvBindings) {
 					strengthType: 'Low'
 				}
 			],
+			// userElements: [
+			// 	{ userLoraId: 12129, weight: 0.8 },
+			// 	{ userLoraId: 12233, weight: 0.3 }
+			// ],
 			guidance_scale: 15,
 			highContrast: false,
 			photoReal: false,
 			highResolution: false,
-			public: true,
+			public: false,
 			scheduler: 'LEONARDO',
 			sd_version: 'SDXL_LIGHTNING',
 			num_inference_steps: 20,
