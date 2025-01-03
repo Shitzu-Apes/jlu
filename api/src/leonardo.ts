@@ -24,10 +24,10 @@ export function generateImage(prompt: string, env: EnvBindings) {
 					strengthType: 'Low'
 				}
 			],
-			// userElements: [
-			// 	{ userLoraId: 12129, weight: 0.8 },
-			// 	{ userLoraId: 12233, weight: 0.3 }
-			// ],
+			userElements: [
+				{ userLoraId: 12129, weight: 0.6 },
+				{ userLoraId: 12233, weight: 0.2 }
+			],
 			guidance_scale: 15,
 			highContrast: false,
 			photoReal: false,
