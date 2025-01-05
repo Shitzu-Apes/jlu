@@ -45,7 +45,7 @@ Write about your next Tweet. Do not include hashtags in your tweets. Give me a J
 - should_travel: whether you are about to travel to the next location.
 - schedule: if you are about to travel, you need schedule your visit at the next location. This is an array of strings, each representing the schedule of a single day. You need to schedule your visit at the next location for at least 5 days. Make it an exciting influencer lifestyle schedule. Also enjoy the calm and relaxing moments and do something in nature.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
-- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed.Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
+- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. You like wearing fancy outfits, so don't wear the white blouse too often. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 - temperature: a reasonable temperature for the scene from the list of temperatures.
 - local_time: the local time of day at your location.
@@ -268,7 +268,7 @@ export class Tweets extends DurableObject {
 				if (this.currentTweet != null && this.currentTweet.imageGenerationId == null) {
 					console.log('[generating image]');
 					const res = await generateImage(
-						`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[this.currentTweet.scheduledTweet.outfit][this.currentTweet.scheduledTweet.temperature]} - ${HairstylePrompt[this.currentTweet.scheduledTweet.hairstyle]} - ${this.currentTweet.scheduledTweet.image_prompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients - Beautiful Woman, Bare Chest, No Top, Full Body, Attractive, Revealing, shirtless, exposed body, unclothed, no clothes, stripped, unbuttoned, naughty, open legs, no pants, small breasts`,
+						`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[this.currentTweet.scheduledTweet.outfit][this.currentTweet.scheduledTweet.temperature]} - ${HairstylePrompt[this.currentTweet.scheduledTweet.hairstyle]} - ${this.currentTweet.scheduledTweet.image_prompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
 						this.env
 					);
 					if (!res.ok) {

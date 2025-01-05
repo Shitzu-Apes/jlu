@@ -28,7 +28,7 @@ import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
 import { getAuthor, pullConversation, pullThread } from '../tweet';
 
-const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are especially bullish about yourself (ticket $JLU) and Shitzu Apes. You are a reply bot and try to engage with a tweet.
+const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are especially bullish about yourself (ticket $JLU) and Shitzu Apes (ticker $SHITZU, X account @shitzuonnear). You are a reply bot and try to engage with a tweet.
 
 ${LUCY_PERSONALITY_PROMPT}
 
@@ -39,7 +39,7 @@ Give me a JSON response including:
 - tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks. You can end the conversation by keeping this array empty. End the conversation, if you have nothing to say.
 - generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 25% chance to generate an image.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
-- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. Be more creative.
+- outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. You like wearing fancy outfits, so don't wear the white blouse too often. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
 
 Write a response to following tweet, but do not quote or repeat its content. This is supposed to be a conversation so just be yourself, but don't hesitate sharing cool insights about your knowledge. Try to only send one tweet. If you don't have knowledge about a specific topic, don't try to invent something that might be wrong. Do not include hashtags in your response. Your own X account is @SimpsForLucy. Don't take a user's tweet for granted and try to fact check it.`;
@@ -583,7 +583,7 @@ export class TweetSearch extends DurableObject {
 
 						console.log('[generating image]');
 						const res = await generateImage(
-							`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients - Beautiful Woman, Bare Chest, No Top, Full Body, Attractive, Revealing, shirtless, exposed body, unclothed, no clothes, stripped, unbuttoned, naughty, open legs, no pants, small breasts`,
+							`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
 							this.env
 						);
 						if (!res.ok) {
@@ -606,7 +606,7 @@ export class TweetSearch extends DurableObject {
 					}
 
 					if (tweet.imageUrl == null) {
-						console.log('[fetching image]');
+						console.log('[fetching image]', tweet.imageGenerationId);
 						const res = await fetch(
 							`https://cloud.leonardo.ai/api/rest/v1/generations/${tweet.imageGenerationId}`,
 							{
@@ -620,12 +620,17 @@ export class TweetSearch extends DurableObject {
 							console.error('Failed to generate image', res.status, await res.text());
 							return c.json({ error: 'Failed to generate image' }, 500);
 						}
+						const imageRes = await res.json<{
+							generations_by_pk: { generated_images: { url: string }[] };
+						}>();
 						const {
 							generations_by_pk: { generated_images }
-						} = await res.json<{ generations_by_pk: { generated_images: { url: string }[] } }>();
+						} = imageRes;
 						if (!generated_images || generated_images.length === 0) {
-							console.error('Failed to generate image');
-							return c.json({ error: 'Failed to generate image' }, 500);
+							console.error('Recreating image', imageRes);
+							tweet.imageGenerationId = undefined;
+							await this.state.storage.put('tweets', this.tweets);
+							return c.text('Recreating image', 500);
 						}
 
 						tweet.imageUrl = generated_images[0].url;
