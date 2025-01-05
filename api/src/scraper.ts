@@ -3,6 +3,9 @@ import { Cookie } from 'tough-cookie';
 
 import type { EnvBindings } from '../types';
 
+import type { EngageableTweet } from './definitions';
+import { getAuthor } from './tweet';
+
 export async function getScraper(env: EnvBindings) {
 	const scraper = new Scraper();
 
@@ -39,4 +42,47 @@ export async function getScraper(env: EnvBindings) {
 	}
 
 	return scraper;
+}
+
+export async function getTweet(scraper: Scraper, tweetId: string, env: EnvBindings) {
+	const scrapedTweet = await scraper.getTweet(tweetId);
+	if (
+		!scrapedTweet ||
+		!scrapedTweet.id ||
+		!scrapedTweet.text ||
+		!scrapedTweet.userId ||
+		!scrapedTweet.username ||
+		!scrapedTweet.timestamp ||
+		scrapedTweet.likes == null ||
+		scrapedTweet.replies == null ||
+		scrapedTweet.retweets == null
+	) {
+		return null;
+	}
+	const tweet: EngageableTweet = {
+		tweet: {
+			id: scrapedTweet.id,
+			text: scrapedTweet.text,
+			author_id: scrapedTweet.userId,
+			created_at: new Date(scrapedTweet.timestamp).toISOString(),
+			public_metrics: {
+				like_count: scrapedTweet.likes,
+				reply_count: scrapedTweet.replies,
+				retweet_count: scrapedTweet.retweets,
+				quote_count: 0,
+				impression_count: 0
+			},
+			author: await getAuthor(scrapedTweet.userId, scrapedTweet.username, scraper, env)
+		},
+		thread: scrapedTweet.thread.map((t) => ({
+			id: t.id ?? '',
+			text: t.text ?? '',
+			author: t.username ?? ''
+		})),
+		inReplyToStatusId: scrapedTweet.inReplyToStatusId
+	};
+	await env.KV.put(`tweet:${tweet.tweet.id}`, JSON.stringify(tweet), {
+		expirationTtl: 60 * 60 * 24 * 3
+	});
+	return tweet;
 }

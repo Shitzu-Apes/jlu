@@ -1,15 +1,11 @@
-import type { Scraper } from 'agent-twitter-client-cf-workers';
+import { type Scraper } from 'agent-twitter-client-cf-workers';
 import { Hono, type Env } from 'hono';
 
 import type { EnvBindings } from '../types';
 
-import type {
-	EngageableTweet,
-	TweetSearchData,
-	TweetSearchResponse,
-	TweetSearchUser
-} from './definitions';
+import type { EngageableTweet, TweetSearchData, TweetSearchUser } from './definitions';
 import type { Tweet } from './do/tweets';
+import { getScraper, getTweet } from './scraper';
 
 export const tweet = new Hono<Env>()
 	.get('/history', async (c) => {
@@ -125,65 +121,19 @@ export async function processReplies(env: EnvBindings, ctx: ExecutionContext) {
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/replies')));
 }
 
-export async function pullThread(tweet: TweetSearchData, env: EnvBindings) {
-	const searchParams = new URLSearchParams();
-	searchParams.set('query', `conversation_id:${tweet.id} from:${tweet.author_id}`);
-	searchParams.set('max_results', '100');
-	searchParams.set('tweet.fields', 'referenced_tweets');
-	searchParams.set('expansions', 'author_id');
-	const res = await fetch(`https://api.x.com/2/tweets/search/recent?${searchParams.toString()}`, {
-		headers: {
-			Authorization: `Bearer ${env.TWITTER_BEARER_TOKEN}`
-		}
-	});
-
-	const tweets = await res.json<TweetSearchResponse>();
-	const thread: {
-		id: string;
-		text: string;
-		author: string;
-	}[] = [];
-
-	let currentTweet: TweetSearchData = tweet;
-	if (tweets.data != null) {
-		while (tweets.data.length > 0) {
-			const referencedTweet = tweets.data.find((t) =>
-				t.referenced_tweets?.find((rt) => rt.type === 'replied_to' && rt.id === currentTweet.id)
-			);
-			if (referencedTweet != null) {
-				const author = tweets.includes.users.find((user) => user.id === tweet.author_id);
-				if (author == null) {
-					break;
-				}
-				const inReplyToStatusId = referencedTweet.referenced_tweets?.find(
-					(rt) => rt.type === 'replied_to' || rt.type === 'quoted'
-				)?.id;
-				const tweetForKV: EngageableTweet = {
-					tweet: {
-						id: referencedTweet.id,
-						text: referencedTweet.text,
-						author_id: referencedTweet.author_id,
-						created_at: referencedTweet.created_at,
-						public_metrics: referencedTweet.public_metrics,
-						author
-					},
-					inReplyToStatusId
-				};
-				await env.KV.put(`tweet:${tweetForKV.tweet.id}`, JSON.stringify(tweetForKV), {
-					expirationTtl: 60 * 60 * 24 * 3
-				});
-				thread.push({
-					id: referencedTweet.id,
-					text: referencedTweet.text,
-					author: author.username
-				});
-				currentTweet = referencedTweet;
-			} else {
-				break;
-			}
-		}
-		return thread;
+export async function pullThread(tweetSearchData: TweetSearchData, env: EnvBindings) {
+	const scraper = await getScraper(env);
+	const scrapedTweet = await getTweet(scraper, tweetSearchData.id, env);
+	if (!scrapedTweet) {
+		return [];
 	}
+	const thread = scrapedTweet.thread?.map((t) => ({
+		id: t.id,
+		text: t.text,
+		author: t.author
+	}));
+	console.log('[thread]', thread);
+	return thread;
 }
 
 export async function pullConversation(startTweetId: string, scraper: Scraper, env: EnvBindings) {
@@ -200,40 +150,10 @@ export async function pullConversation(startTweetId: string, scraper: Scraper, e
 				author: repliedTweet.tweet.author?.username ?? ''
 			});
 		} else {
-			const scrapedTweet = await scraper.getTweet(currentTweetId);
-			if (
-				!scrapedTweet ||
-				!scrapedTweet.id ||
-				!scrapedTweet.text ||
-				!scrapedTweet.userId ||
-				!scrapedTweet.username ||
-				!scrapedTweet.timestamp ||
-				scrapedTweet.likes == null ||
-				scrapedTweet.replies == null ||
-				scrapedTweet.retweets == null
-			) {
-				continue;
+			repliedTweet = await getTweet(scraper, currentTweetId, env);
+			if (!repliedTweet) {
+				break;
 			}
-			repliedTweet = {
-				tweet: {
-					id: scrapedTweet.id,
-					text: scrapedTweet.text,
-					author_id: scrapedTweet.userId,
-					created_at: new Date(scrapedTweet.timestamp).toISOString(),
-					public_metrics: {
-						like_count: scrapedTweet.likes,
-						reply_count: scrapedTweet.replies,
-						retweet_count: scrapedTweet.retweets,
-						quote_count: 0,
-						impression_count: 0
-					},
-					author: await getAuthor(scrapedTweet.userId, scrapedTweet.username, scraper, env)
-				},
-				inReplyToStatusId: scrapedTweet.inReplyToStatusId
-			};
-			await env.KV.put(`tweet:${repliedTweet.tweet.id}`, JSON.stringify(repliedTweet), {
-				expirationTtl: 60 * 60 * 24 * 3
-			});
 			conversation.unshift({
 				id: repliedTweet.tweet.id,
 				text: repliedTweet.tweet.text,
