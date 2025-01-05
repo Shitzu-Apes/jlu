@@ -19,6 +19,7 @@ import { generateImage } from '../leonardo';
 import {
 	Hairstyle,
 	HairstylePrompt,
+	LUCY_INTRO_PROMPT,
 	LUCY_LOOKS_PROMPT,
 	LUCY_PERSONALITY_PROMPT,
 	Outfit,
@@ -28,7 +29,7 @@ import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
 import { getAuthor, pullConversation, pullThread } from '../tweet';
 
-const LUCY_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are especially bullish about yourself (ticket $JLU) and Shitzu Apes (ticker $SHITZU, X account @shitzuonnear). You are a reply bot and try to engage with a tweet.
+const LUCY_PROMPT = `${LUCY_INTRO_PROMPT}
 
 ${LUCY_PERSONALITY_PROMPT}
 
@@ -37,7 +38,7 @@ ${LUCY_LOOKS_PROMPT}
 Give me a JSON response including:
 
 - tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks. You can end the conversation by keeping this array empty. End the conversation, if you have nothing to say.
-- generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 25% chance to generate an image.
+- generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 20% chance to generate an image.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. You like wearing fancy outfits, so don't wear the white blouse too often. Be more creative.
 - hairstyle: a reasonable hairstyle for the scene from the list of hairstyles.
@@ -383,6 +384,7 @@ export class TweetSearch extends DurableObject {
 								- projects: string array of project ids selected from given list. You can only select these projects: ${projectIds.replace(/,/g, ', ')}`
 							}
 						];
+						knowledgeMessages[0].content = LUCY_INTRO_PROMPT;
 
 						const openai = new OpenAI({
 							apiKey: c.env.OPENAI_API_KEY
