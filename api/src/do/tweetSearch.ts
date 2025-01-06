@@ -452,7 +452,7 @@ export class TweetSearch extends DurableObject {
 
 						messages.push({
 							role: 'system' as const,
-							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge. You have Twitter Premium, so you can tweet up to 4000 characters. You should however prefer 280 character tweets and only send longer tweets, if it's really necessary.\n\n${categories}\n\n${projects}`
+							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge, but only if the conversation is related to web3. You have Twitter Premium, so you can tweet up to 4000 characters. You should however prefer 280 character tweets and only send longer tweets, if it's really necessary. Try to only send one tweet and don't use hashtags.\n\n${categories}\n\n${projects}`
 						});
 						messages.push({
 							role: 'system' as const,
@@ -540,33 +540,44 @@ export class TweetSearch extends DurableObject {
 						}>();
 						if (apiPaidTokens < 2_000 || !tweet.generateImage) {
 							console.log('[using previous generations]');
-							const previousGenRes = await fetch(
-								`https://cloud.leonardo.ai/api/rest/v1/generations/user/${leoUserId}?offset=0&limit=500`,
-								{
-									headers: {
-										Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
-										Accept: 'application/json'
-									}
-								}
-							);
-							const { generations: allGenerations } = await previousGenRes.json<{
-								generations: {
-									id: string;
-									status: string;
-									sdVersion: string;
-									scheduler: string;
-									presetStyle: string;
-									modelId: string;
-									generated_images: { id: string; url: string }[];
-								}[];
-							}>();
+							const allGenerations = (
+								await Promise.all(
+									[0, 50].map((offset) => {
+										return fetch(
+											`https://cloud.leonardo.ai/api/rest/v1/generations/user/${leoUserId}?offset=${offset}&limit=50`,
+											{
+												headers: {
+													Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
+													Accept: 'application/json'
+												}
+											}
+										)
+											.then((res) =>
+												res.json<{
+													generations: {
+														id: string;
+														status: string;
+														sdVersion: string;
+														scheduler: string;
+														presetStyle: string;
+														modelId: string;
+														generation_elements?: { id: number; weightApplied: number }[];
+														generated_images: { id: string; url: string }[];
+													}[];
+												}>()
+											)
+											.then((res) => res.generations);
+									})
+								)
+							).flat();
 							const generations = allGenerations.filter(
 								(gen) =>
 									gen.status === 'COMPLETE' &&
 									gen.sdVersion === 'SDXL_LIGHTNING' &&
 									gen.scheduler === 'LEONARDO' &&
 									gen.presetStyle === 'DYNAMIC' &&
-									gen.modelId === 'e71a1c2f-4f80-4800-934f-2c68979d8cc8'
+									gen.modelId === 'e71a1c2f-4f80-4800-934f-2c68979d8cc8' &&
+									gen.generation_elements?.find((el) => el.weightApplied >= 0.9) == null
 							);
 							const generation = generations[Math.floor(Math.random() * generations.length)];
 
@@ -576,7 +587,10 @@ export class TweetSearch extends DurableObject {
 							}
 
 							tweet.imageGenerationId = generation.id;
-							tweet.imageUrl = generation.generated_images[0].url;
+							tweet.imageUrl =
+								generation.generated_images[
+									Math.floor(Math.random() * generation.generated_images.length)
+								].url;
 							await this.state.storage.put('tweets', this.tweets);
 							console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
 							console.log('[tweet.imageUrl]', tweet.imageUrl);

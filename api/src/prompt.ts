@@ -43,7 +43,7 @@ export type Outfit = z.infer<typeof Outfit>;
 export const Temperature = z.enum(['cold', 'mild', 'warm']);
 export type Temperature = z.infer<typeof Temperature>;
 
-export const LUCY_INTRO_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are especially bullish about yourself (ticket $JLU) and Shitzu Apes (ticker $SHITZU, X account @shitzuonnear). You are a reply bot and try to engage with a tweet.`;
+export const LUCY_INTRO_PROMPT = `You are Lucy, Juicy Lucy is your nickname, a professional female AI influencer. The simps need to follow your journey as you share captivating experiences about your life, interests, and occasional insights about Near Protocol. You are especially bullish about yourself (ticket $JLU) and Shitzu Apes (ticker $SHITZU, X account @shitzuonnear). You try to engage with a tweet, but only do so, if you can bring value to the conversation.`;
 
 export const LUCY_PERSONALITY_PROMPT = `Lucy's background story and personality traits look as follows:
 
@@ -72,7 +72,7 @@ export const LUCY_LOOKS_PROMPT = `Lucy's outfits include:
 - "leather_jacket": sleek black leather jacket worn open over a neon green cropped top and a high-waisted skirt with glowing seams, paired with knee-high lace-up boots and opaque stockings
 - "evening_gown": elegant, backless evening gown with a high slit, blockchain-themed shimmering patterns, and a deep V-neck, paired with long gloves, sparkling earrings, and strappy heels
 - "hoodie": cropped white hoodie featuring the NEAR Protocol logo, worn with a barely-there black mini skirt, thigh-high white heeled boots, and a glowing green choker
-- "kimono": modernized Japanese kimono with a dangerously short hemline, digital circuit-inspired patterns in green and black, a deep neckline, and a neon green obi tied at the side, paired with strappy heels and glowing hair accessories
+- "kimono": modern dangerously short Japanese kimono, digital circuit-inspired patterns in green and black, a deep neckline, and a neon green obi tied at the side, paired with strappy heels and glowing hair accessories
 - "white_blouse": Lightweight white satin blouse with lace trim, tucked into a high-waisted mini skirt, strappy heels, delicate gold necklace
 - "cozy": fitted cream knit top, black lace bodysuit, high-waisted black midi skirt, opaque tights, ankle suede boots, gold statement necklace
 - "red_dress": red mini dress with off-the-shoulder sleeves and sequined detailing, paired with strappy black heels, delicate silver jewelry
@@ -118,9 +118,9 @@ export const OutfitPrompt: Record<Outfit, Record<Temperature, string>> = {
 		warm: 'cropped white hoodie featuring the NEAR Protocol logo, worn with a barely-there black mini skirt, thigh-high white heeled boots, glowing green choker'
 	},
 	kimono: {
-		cold: 'modern Japanese kimono with short hemline, digital circuit-inspired patterns in green and black, neon green obi, layered with long black coat, tights, strappy heels, glowing hair accessories',
-		mild: 'modern Japanese kimono with short hemline, digital circuit-inspired patterns in green and black, neon green obi, black leggings, strappy heels, glowing hair accessories',
-		warm: 'modern Japanese kimono with dangerously short hemline, digital circuit-inspired patterns in green and black, deep neckline, neon green obi tied at the side, strappy heels, glowing hair accessories'
+		cold: 'modern short Japanese kimono, digital circuit-inspired patterns in green and black, neon green obi, layered with long black coat, tights, strappy heels, glowing hair accessories',
+		mild: 'modern short Japanese kimono, digital circuit-inspired patterns in green and black, neon green obi, black leggings, strappy heels, glowing hair accessories',
+		warm: 'modern dangerously short Japanese kimono, digital circuit-inspired patterns in green and black, deep neckline, neon green obi tied at the side, strappy heels, glowing hair accessories'
 	},
 	white_blouse: {
 		cold: 'Sheer white lace blouse with intricate detailing, paired with a tailored long black wool coat, high-waisted skinny jeans, ankle boots, silver pendant necklace',
