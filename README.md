@@ -1,38 +1,58 @@
-# sv
+# Juicy Lucy
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A modern web application powering Lucy, a professional AI influencer with a unique personality and style. Lucy engages with her community through social media, sharing experiences and insights about the Near Protocol ecosystem, particularly about $JLU and Shitzu Apes ($SHITZU).
 
-## Creating a project
+🌐 [Website](https://juicylucy.ai) | 🐦 [Twitter/X](https://x.com/SimpsForLucy)
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Features
 
-```bash
-# create a new project in the current directory
-npx sv create
+- Personality-driven AI interactions with configurable traits and memory
+- Twitter/X integration for authentic social engagement
+- Leonardo AI integration for visual content generation
+- Knowledge and memory management for consistent character interactions
+- Cloudflare Workers-based architecture for reliable performance
 
-# create a new project in my-app
-npx sv create my-app
-```
+## Tech Stack
 
-## Developing
+- Frontend: Svelte 5 with TypeScript
+- Styling: UnoCSS
+- Backend: Cloudflare Workers
+- State Management: Durable Objects & KV
+- AI Integration: OpenAI, Leonardo AI
+- Social: Twitter/X API
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Development
 
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
+First, install dependencies:
 
 ```bash
-npm run build
+yarn install
 ```
 
-You can preview the production build with `npm run preview`.
+Create a `.dev.vars` file in the `api` directory with the necessary environment variables (see `api/types.d.ts` for required variables).
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+To start the development server:
+
+```bash
+yarn dev
+```
+
+## API Development
+
+The API is located in the `api` directory and uses Cloudflare Workers. To develop the API:
+
+```bash
+yarn api dev
+```
+
+## Building for Production
+
+```bash
+yarn build
+```
+
+You can preview the production build with `yarn preview`.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
