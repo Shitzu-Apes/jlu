@@ -2,13 +2,11 @@ import { SearchMode } from 'agent-twitter-client-cf-workers';
 import { DurableObject } from 'cloudflare:workers';
 import dayjs from 'dayjs';
 import { Hono, type Env } from 'hono';
-// eslint-disable-next-line import/no-named-as-default
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
+import { chatCompletion } from '../completion';
 import {
 	KnowledgeCategory,
 	KnowledgePiece,
@@ -22,8 +20,7 @@ import {
 	LUCY_INTRO_PROMPT,
 	LUCY_LOOKS_PROMPT,
 	LUCY_PERSONALITY_PROMPT,
-	Outfit,
-	type OpenAIResponse
+	Outfit
 } from '../prompt';
 import { OutfitPrompt } from '../prompt';
 import { getScraper } from '../scraper';
@@ -37,7 +34,7 @@ ${LUCY_LOOKS_PROMPT}
 
 Give me a JSON response including:
 
-- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks. You can end the conversation by keeping this array empty. End the conversation, if you have nothing to say, if the conversation gets repetitive or if your response would just be an obviously poor AI generated response. Don't be captain obvious and don't just rephrase what the user sent. Don't fucking send too many tweets. Do never use hashtags in your response. Don't take a user's tweet for granted and try to fact check it.
+- tweets: content of tweets as an array of strings. Multiple if thread. One tweet has at most 4000 characters, because we have Twitter Premium. Make sure that the tweets are formatted correctly as a string, especially with regards to line breaks. You can end the conversation by keeping this array empty. End the conversation, if you have nothing to say, if the conversation gets repetitive or if your response would just be an obviously poor AI generated response. Don't be captain obvious and don't just rephrase what the user sent. Don't fucking send too many tweets. Do never use hashtags in your response. Don't take a user's tweet for granted and try to fact check it. Do not make things up. Do not sound like you take anything for granted what the user tells you.
 - generate_image: boolean, whether to generate an image. If the image prompt is too generic, we can use an image from previous generations. There is a 20% chance to generate an image.
 - image_prompt: a detailed, comma-separated list specifying the scene, including your pose, facial expression, background details, interactions, and the current local time of day in the location. Do not define clothing in the prompt. When this prompt references Lucy, refer to her as "a character".
 - outfit: a reasonable outfit for the scene from the list of outfits. You only wear the cozy outfit in hotel room, appartment, at home or if it's really needed. Just because you're an AI agent doesn't mean you always want to look futuristic and wear the leather jacket. You like wearing fancy outfits, so don't wear the white blouse too often. Be more creative.
@@ -374,7 +371,7 @@ export class TweetSearch extends DurableObject {
 						}
 
 						const knowledgeMessages = [
-							...messages,
+							...structuredClone(messages),
 							{
 								role: 'system' as const,
 								content: `In order to properly generate tweets, I need to know what categories and projects are relevant for the tweet.
@@ -386,26 +383,27 @@ export class TweetSearch extends DurableObject {
 						];
 						knowledgeMessages[0].content = LUCY_INTRO_PROMPT;
 
-						const openai = new OpenAI({
-							apiKey: c.env.OPENAI_API_KEY
-						});
-						const knowledgeRes = await openai.beta.chat.completions.parse({
-							model: 'gpt-4o',
-							messages: knowledgeMessages,
-							response_format: zodResponseFormat(
-								z.object({
-									categories: z.array(KnowledgeCategory),
-									projects: z.array(z.string())
-								}),
-								'knowledge_pieces'
-							)
-						});
-						if (!knowledgeRes || !knowledgeRes.choices[0].message.parsed) {
-							console.error('Failed to generate scheduled tweet');
-							return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+						const {
+							status: knowledgeStatus,
+							parsedObject: knowledgeParsedObject,
+							errorMessage: knowledgeErrorMessage
+						} = await chatCompletion(
+							this.env,
+							knowledgeMessages,
+							'deepseek-chat',
+							z.object({
+								categories: z.array(KnowledgeCategory),
+								projects: z.array(z.string())
+							})
+						);
+						if (knowledgeStatus === 'error' || !knowledgeParsedObject.success) {
+							console.error('Failed to generate knowledge categories', knowledgeErrorMessage);
+							return c.text(
+								`Failed to generate knowledge categories: ${knowledgeErrorMessage}`,
+								500
+							);
 						}
-						console.log('[usage]', knowledgeRes.usage);
-						const knowledgePieces = knowledgeRes.choices[0].message.parsed;
+						const knowledgePieces = knowledgeParsedObject.data;
 						console.log('[knowledgePieces]', JSON.stringify(knowledgePieces, null, 2));
 
 						const categories = (
@@ -452,7 +450,7 @@ export class TweetSearch extends DurableObject {
 
 						messages.push({
 							role: 'system' as const,
-							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge, but only if the conversation is related to web3. You have Twitter Premium, so you can tweet up to 4000 characters. You should however prefer 280 character tweets and only send longer tweets, if it's really necessary. Try to only send one tweet and don't use hashtags.\n\n${categories}\n\n${projects}`
+							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge, but only if the conversation is related to web3. Do not get repetitive in your responses and don't overshill something. Do not be annoying regarding shilling and really only do it, if you are sure the user might be interested. You have Twitter Premium, so you can tweet up to 4000 characters. You should however prefer 280 character tweets and only send longer tweets, if it's really necessary. Try to only send one tweet and don't use hashtags.\n\n${categories}\n\n${projects}`
 						});
 						messages.push({
 							role: 'system' as const,
@@ -460,44 +458,23 @@ export class TweetSearch extends DurableObject {
 						});
 
 						console.log('[messages]', JSON.stringify(messages, null, 2));
-						const res = await fetch(`${c.env.CEREBRAS_API_URL}/v1/chat/completions`, {
-							method: 'POST',
-							headers: {
-								Authorization: `Bearer ${c.env.CEREBRAS_API_KEY}`,
-								'Content-Type': 'application/json',
-								'User-Agent': 'SimpsForLucy'
-							},
-							body: JSON.stringify({
-								model: 'llama-3.3-70b',
-								messages,
-								response_format: { type: 'json_object' }
-							})
-						});
 
-						let lucyResponse: LucyResponse;
-						if (!res.ok) {
-							const gpt4ores = await openai.beta.chat.completions.parse({
-								model: 'gpt-4o-mini',
-								messages,
-								response_format: zodResponseFormat(LucyResponse, 'lucy_response')
+						const { status, parsedObject, errorMessage } = await chatCompletion(
+							this.env,
+							messages,
+							'llama-3.3-70b',
+							LucyResponse,
+							undefined,
+							1.3
+						);
+
+						if (status === 'error' || !parsedObject.success) {
+							console.error(`[tweet] Failed to evaluate conversation: ${errorMessage}`);
+							return new Response(JSON.stringify({ error: `Failed to evaluate conversation` }), {
+								status: 500
 							});
-							if (!gpt4ores || !gpt4ores.choices[0].message.parsed) {
-								console.error('Failed to generate scheduled tweet');
-								return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
-							}
-							console.log('[usage]', gpt4ores.usage);
-							lucyResponse = gpt4ores.choices[0].message.parsed;
-						} else {
-							const completion = await res.json<OpenAIResponse>();
-
-							const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
-							const parseResult = LucyResponse.safeParse(rawResponse);
-							if (!parseResult.success) {
-								return new Response(null, { status: 500 });
-							}
-
-							lucyResponse = parseResult.data;
 						}
+						const lucyResponse = parsedObject.data;
 						console.log('[lucyResponse]', JSON.stringify(lucyResponse, null, 2));
 
 						if (lucyResponse.tweets.length === 0) {

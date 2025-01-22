@@ -1,12 +1,11 @@
 import { DurableObject } from 'cloudflare:workers';
 import dayjs from 'dayjs';
 import { Hono, type Env } from 'hono';
-import { OpenAI } from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 import { z } from 'zod';
 
 import type { EnvBindings, Optional } from '../../types';
+import { chatCompletion } from '../completion';
 import { generateImage } from '../leonardo';
 import { storeMemory } from '../memory';
 import {
@@ -109,10 +108,6 @@ export class Tweets extends DurableObject {
 
 		this.hono = new Hono<Env>()
 			.get('/schedule', async (c) => {
-				const openai = new OpenAI({
-					apiKey: this.env.OPENAI_API_KEY
-				});
-
 				const canScheduleNextTweet =
 					this.nextTweetTimestamp == null || Date.now() >= this.nextTweetTimestamp;
 				if (canScheduleNextTweet) {
@@ -212,50 +207,41 @@ export class Tweets extends DurableObject {
 						});
 					}
 
-					const o1res = await openai.chat.completions.create({
-						model: 'o1-preview',
-						messages
-					});
-					if (!o1res || !o1res.choices[0].message.content) {
-						console.error('Failed to generate scheduled tweet');
-						return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
-					}
-					const o1Response = o1res.choices[0].message.content;
-
-					const refinedMessages = [...messages];
-					refinedMessages.push({
-						role: 'system',
-						content: `Given the following data, format it with the given response format.`
-					});
-					refinedMessages.push({ role: 'assistant', content: o1Response });
-					let gpt4ores = await openai.beta.chat.completions.parse({
-						model: 'gpt-4o-mini',
-						messages: refinedMessages,
-						response_format: zodResponseFormat(ScheduledTweetSchema, 'scheduled_tweet')
-					});
-					if (!gpt4ores || !gpt4ores.choices[0].message.parsed) {
-						console.error('Failed to generate scheduled tweet');
-						return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+					const { status, parsedObject, errorMessage } = await chatCompletion(
+						this.env,
+						messages,
+						'deepseek-chat',
+						ScheduledTweetSchema
+					);
+					if (status === 'error' || !parsedObject.success) {
+						console.error('Failed to generate scheduled tweet', errorMessage);
+						return c.text(`Failed to generate scheduled tweet: ${errorMessage}`, 500);
 					}
 
-					const gpt4oResponse = gpt4ores.choices[0].message.parsed;
-					messages.push({ role: 'assistant', content: JSON.stringify(gpt4oResponse) });
+					messages.push({ role: 'assistant', content: JSON.stringify(parsedObject.data) });
 					messages.push({
 						role: 'system',
-						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. ${localTime ? `The current actual local time is ${localTime}.` : `The current actual UTC time is ${new Date().toISOString()}.`} Your location is ${gpt4oResponse.location.city}, ${gpt4oResponse.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
+						content: `Make sure that travel time, cooldown, temperature, location and day time are correct. ${localTime ? `The current actual local time is ${localTime}.` : `The current actual UTC time is ${new Date().toISOString()}.`} Your location is ${parsedObject.data.location.city}, ${parsedObject.data.location.country}. Check if your local time matches the day time of your location. Do respective changes, if you find that the data is not correct.`
 					});
-					gpt4ores = await openai.beta.chat.completions.parse({
-						model: 'gpt-4o-mini',
+					const {
+						status: status2,
+						parsedObject: parsedObject2,
+						errorMessage: errorMessage2
+					} = await chatCompletion(
+						this.env,
 						messages,
-						response_format: zodResponseFormat(ScheduledTweetSchema, 'scheduled_tweet')
-					});
-					if (!gpt4ores || !gpt4ores.choices[0].message.parsed) {
-						console.error('Failed to generate scheduled tweet');
-						return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+						'deepseek-chat',
+						ScheduledTweetSchema,
+						undefined,
+						1.3
+					);
+					if (status2 === 'error' || !parsedObject2.success) {
+						console.error('Failed to generate scheduled tweet', errorMessage2);
+						return c.text(`Failed to generate scheduled tweet: ${errorMessage2}`, 500);
 					}
 
 					this.currentTweet = {
-						scheduledTweet: gpt4ores.choices[0].message.parsed,
+						scheduledTweet: parsedObject2.data,
 						startedAt: Date.now()
 					};
 					await this.state.storage.put('currentTweet', this.currentTweet);

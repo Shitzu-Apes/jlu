@@ -3,11 +3,9 @@ import dayjs from 'dayjs';
 import { Hono } from 'hono';
 import type { Context, Env } from 'hono';
 import { Parser } from 'htmlparser2';
-// eslint-disable-next-line import/no-named-as-default
-import OpenAI from 'openai';
-import { zodResponseFormat } from 'openai/helpers/zod.mjs';
 
 import type { EnvBindings } from '../../types';
+import { chatCompletion } from '../completion';
 import {
 	KnowledgeCategory,
 	KnowledgePieces,
@@ -183,7 +181,7 @@ export class Knowledge extends DurableObject {
 				links = Array.from(new Set(links));
 				links.splice(3);
 				links.reverse();
-				console.log('[links]', links);
+				console.log('[links]', links, this.nearweekLatestId);
 				const link = links.find(
 					(l) => Number(l.split('near-newsletter-')[1] ?? '0') > this.nearweekLatestId
 				);
@@ -192,8 +190,6 @@ export class Knowledge extends DurableObject {
 					return new Response(null, { status: 204 });
 				}
 				console.log('[link]', link);
-				this.nearweekLatestId = Number(link.split('near-newsletter-')[1] ?? '0');
-				await this.state.storage.put('nearweekLatestId', this.nearweekLatestId);
 
 				const res = await fetch(link);
 				const newsletter = await res.text();
@@ -222,6 +218,8 @@ export class Knowledge extends DurableObject {
 				}
 
 				await this.storeKnowledgePieces(knowledgePieces);
+				this.nearweekLatestId = Number(link.split('near-newsletter-')[1] ?? '0');
+				await this.state.storage.put('nearweekLatestId', this.nearweekLatestId);
 
 				return new Response(null, { status: 204 });
 			})
@@ -251,14 +249,12 @@ export class Knowledge extends DurableObject {
 			return new Response(null, { status: 500 });
 		}
 
-		const openai = new OpenAI({
-			apiKey: c.env.OPENAI_API_KEY
-		});
 		const messages = [
 			{
 				role: 'system' as const,
-				content: `Given following ${type}, extract knowledge from it in a concrete but detailed, unbiased and unopinionated way. Only provide the rewrite, no other text. The knowledge objects should have as many details as possible. Do not provide information about the ${type} itself, only the information that should be stored as a knowledge base. Deduplicate the knowledge objects, if their content is similar.
-				Output as a JSON array of objects with the following fields:
+				content: `Given following ${type}, extract knowledge from it in a concrete but detailed, unbiased and unopinionated way. Only provide the rewrite, no other text. The knowledge objects should have as many details as possible. Do not provide information about the ${type} itself, only the information that should be stored as a knowledge base. Deduplicate the knowledge objects, if their content is similar. If the ${type} contains irrelevant information, ignore it.
+				Output as a JSON object with the field "pieces".
+				pieces is an array of objects with the following fields:
 				- created_at: date of the ${type} in YYYY-MM-DD format
 				- text: full sentence string of the information
 				- categories: string array of categories selected from given list. You can only select these categories: ${KnowledgeCategory.options.join(', ')}
@@ -270,17 +266,22 @@ export class Knowledge extends DurableObject {
 				content
 			}
 		];
-		const gpt4ores = await openai.beta.chat.completions.parse({
-			model: 'gpt-4o-mini',
+		const { status, parsedObject, errorMessage, rawResponse } = await chatCompletion(
+			this.env,
 			messages,
-			response_format: zodResponseFormat(KnowledgePieces, 'knowledge_pieces')
-		});
-		if (!gpt4ores || !gpt4ores.choices[0].message.parsed) {
-			console.error('Failed to generate scheduled tweet');
-			return c.json({ error: 'Failed to generate scheduled tweet' }, 500);
+			'deepseek-chat',
+			KnowledgePieces
+		);
+		if (status === 'error' || !parsedObject.success) {
+			console.error(
+				'Failed to generate knowledge pieces',
+				errorMessage,
+				rawResponse,
+				parsedObject?.error?.errors
+			);
+			return c.text(`Failed to generate knowledge pieces: ${errorMessage}`, 500);
 		}
-		console.log('[usage]', gpt4ores.usage);
-		const knowledgePieces = gpt4ores.choices[0].message.parsed;
+		const knowledgePieces = parsedObject.data;
 		console.log('[knowledgePieces]', JSON.stringify(knowledgePieces, null, 2));
 
 		return knowledgePieces;

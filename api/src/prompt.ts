@@ -1,32 +1,4 @@
-import { encodingForModel, type TiktokenModel } from 'js-tiktoken';
 import { z } from 'zod';
-
-// Get exact token count using tiktoken
-export function countTokens(text: string, model: TiktokenModel): number {
-	if (model === ('llama-3.3-70b' as TiktokenModel)) {
-		// Simple approximation: average English word is ~4 characters
-		// and Llama typically uses ~1.3 tokens per word
-		const wordCount = text.split(/\s+/).length;
-		return Math.ceil(wordCount * 1.3);
-	}
-
-	const enc = encodingForModel(model);
-	const tokens = enc.encode(text);
-	return tokens.length;
-}
-
-export type OpenAIResponse = {
-	choices: Array<{
-		message: {
-			content: string;
-		};
-	}>;
-	usage: {
-		prompt_tokens: number;
-		completion_tokens: number;
-		total_tokens: number;
-	};
-};
 
 export const Outfit = z.enum([
 	'corset_dress',

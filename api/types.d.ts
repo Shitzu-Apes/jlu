@@ -15,8 +15,10 @@ interface EnvBindings {
 	TWITTER_CLIENT_ID: string;
 	TWITTER_CLIENT_SECRET: string;
 	CEREBRAS_API_URL: string;
+	DEEPSEEK_API_URL: string;
 	CEREBRAS_API_KEY: string;
 	OPENAI_API_KEY: string;
+	DEEPSEEK_API_KEY: string;
 	LEONARDO_API_KEY: string;
 	TWITTER_LUCY_USER_ID: string;
 	TWITTER_BEARER_TOKEN: string;

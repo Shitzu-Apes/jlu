@@ -32,7 +32,7 @@ export async function getScraper(env: EnvBindings) {
 			env.TWITTER_ACCESS_SECRET
 		);
 		cookies = await scraper.getCookies();
-		console.log('[store cookies]', cookies);
+		console.log('[store cookies]', JSON.stringify(cookies));
 		await env.KV.put('twitter_cookies', JSON.stringify(cookies), {
 			expirationTtl: 60 * 60 * 24 * 365
 		});
