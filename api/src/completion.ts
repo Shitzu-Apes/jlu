@@ -81,6 +81,13 @@ export async function chatCompletion<
 	temperature?: number,
 	responseFormat = { type: 'json_object' }
 ) {
+	const tokens = messages.reduce(
+		(sum, msg) => (typeof msg.content === 'string' ? sum + countTokens(msg.content, model) : sum),
+		0
+	);
+	if (tokens > 8192) {
+		model = 'deepseek-chat';
+	}
 	const response = await match(model)
 		.with('llama-3.3-70b', () =>
 			fetch(`${env.CEREBRAS_API_URL}/v1/chat/completions`, {
