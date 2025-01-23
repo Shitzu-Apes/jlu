@@ -16,15 +16,14 @@ export function generateImage(prompt: string, env: EnvBindings) {
 			presetStyle: 'DYNAMIC',
 			prompt,
 			width: 512,
-			// TODO Leonardo seems to have introduced a bug
-			// controlnets: [
-			// 	{
-			// 		initImageId: 'deee2498-3dd3-4e3f-ac77-a9463998ed92',
-			// 		initImageType: 'UPLOADED',
-			// 		preprocessorId: 67,
-			// 		strengthType: 'Low'
-			// 	}
-			// ],
+			controlnets: [
+				{
+					initImageId: 'deee2498-3dd3-4e3f-ac77-a9463998ed92',
+					initImageType: 'UPLOADED',
+					preprocessorId: 67,
+					strengthType: 'Low'
+				}
+			],
 			userElements: [
 				{ userLoraId: 12129, weight: 0.6 },
 				{ userLoraId: 12233, weight: 0.5 }
