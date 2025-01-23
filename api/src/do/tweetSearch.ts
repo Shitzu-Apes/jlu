@@ -64,7 +64,7 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-type Query = 'ai_agents' | 'near' | 'simps';
+type Query = 'ai_agents' | 'near' | 'simps' | 'ethDenver';
 
 const Queries: Record<
 	Query,
@@ -93,6 +93,17 @@ const Queries: Record<
 	near: {
 		query:
 			'("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu" OR nearprotocol OR "near da") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
+		pullThread: true,
+		maxResults: 10,
+		minImpressions: 10,
+		checkAuthor: true,
+		minFollowers: 25,
+		minListedCount: 0,
+		useCursor: false
+	},
+	ethDenver: {
+		query:
+			'("eth denver" OR "eth conference") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
 		pullThread: true,
 		maxResults: 10,
 		minImpressions: 10,
@@ -130,7 +141,8 @@ export class TweetSearch extends DurableObject {
 	private queryCursors: Record<Query, string | null> = {
 		ai_agents: null,
 		near: null,
-		simps: null
+		simps: null,
+		ethDenver: null
 	};
 
 	constructor(
@@ -148,7 +160,8 @@ export class TweetSearch extends DurableObject {
 			this.queryCursors = (await this.state.storage.get('queryCursors')) ?? {
 				ai_agents: null,
 				near: null,
-				simps: null
+				simps: null,
+				ethDenver: null
 			};
 		});
 

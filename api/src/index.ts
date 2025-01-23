@@ -22,7 +22,8 @@ import {
 	scrapeLucy,
 	searchNearTweets,
 	searchSimpsTweets,
-	tweet
+	tweet,
+	searchEthDenverTweets
 } from './tweet';
 
 // eslint-disable-next-line import/no-named-as-default-member
@@ -107,6 +108,9 @@ export default {
 				break;
 			case '40 * * * *':
 				await searchNearTweets(env, ctx);
+				break;
+			case '45 * * * *':
+				await searchEthDenverTweets(env, ctx);
 				break;
 			case '50 * * * *':
 				await searchSimpsTweets(env, ctx);
