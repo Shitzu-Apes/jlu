@@ -29,7 +29,7 @@ export function countTokens(text: string, model: AiModel): number {
 			// Simple approximation: average English word is ~4 characters
 			// and Llama typically uses ~1.3 tokens per word
 			const wordCount = text.split(/\s+/).length;
-			return Math.ceil(wordCount * 1.3);
+			return Math.ceil(wordCount * 1.4);
 		})
 		.with(P.union('deepseek-chat', 'deepseek-reasoner'), () => {
 			return text.length * 0.3;
