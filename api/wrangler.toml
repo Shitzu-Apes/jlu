@@ -21,7 +21,7 @@ CEREBRAS_API_URL = "https://api.cerebras.ai"
 DEEPSEEK_API_URL = "https://api.deepseek.com"
 NEAR_ACCOUNT_ID = "juicylucy.near"
 JLU_TOKEN_ID = "jlu-1018.meme-cooking.near"
-JLU_PER_POINT = "25000000000000000000"
+JLU_PER_POINT = "20000000000000000000"
 
 [durable_objects]
 bindings = [

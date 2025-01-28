@@ -48,7 +48,7 @@ How It Works
 - Chat with Lucy: Users can participate in lighthearted and dynamic conversations with Lucy.
 - Earn Rewards: Interactions are scored, and points are converted into on-chain tokens.
 - Share & Engage: Moments with Lucy can be shared on platforms like X (formerly Twitter), building a community around the experience.
-- Juicy Lucy is more than just a game—it’s a creative way to explore the possibilities of blockchain and Web3. By integrating with the Near Protocol ecosystem, the project makes decentralized technology approachable and rewarding.
+- Juicy Lucy is more than just a game—it's a creative way to explore the possibilities of blockchain and Web3. By integrating with the Near Protocol ecosystem, the project makes decentralized technology approachable and rewarding.
 
 Links:
 - Dapp: https://juicylucy.ai
@@ -153,7 +153,32 @@ export class TweetSearch extends DurableObject {
 		this.tweets = [];
 
 		this.state.blockConcurrencyWhile(async () => {
-			this.tweets = (await this.state.storage.get('tweets')) ?? [];
+			// Try to get compressed data first
+			const compressedTweets = await this.state.storage.get('tweetsGzip');
+			if (compressedTweets instanceof ArrayBuffer) {
+				const decompressed = new Response(compressedTweets).body?.pipeThrough(
+					new DecompressionStream('gzip')
+				);
+				if (decompressed) {
+					const text = await new Response(decompressed).text();
+					this.tweets = JSON.parse(text) ?? [];
+				}
+			} else {
+				// Fall back to old uncompressed data
+				const oldTweets = await this.state.storage.get<EngageableTweet[]>('tweets');
+				if (oldTweets) {
+					this.tweets = oldTweets;
+					// Migrate to compressed format
+					const stream = new Blob([JSON.stringify(this.tweets)])
+						.stream()
+						.pipeThrough(new CompressionStream('gzip'));
+					const compressedResponse = new Response(stream);
+					const compressedData = await compressedResponse.arrayBuffer();
+					await this.state.storage.put('tweetsGzip', compressedData);
+					await this.state.storage.delete('tweets');
+				}
+			}
+
 			this.scrapeCursors = (await this.state.storage.get('scrapeCursors')) ?? {
 				lucy: null
 			};
@@ -164,6 +189,15 @@ export class TweetSearch extends DurableObject {
 				ethDenver: null
 			};
 		});
+
+		const storeTweets = async () => {
+			const stream = new Blob([JSON.stringify(this.tweets)])
+				.stream()
+				.pipeThrough(new CompressionStream('gzip'));
+			const compressedResponse = new Response(stream);
+			const compressedData = await compressedResponse.arrayBuffer();
+			await this.state.storage.put('tweetsGzip', compressedData);
+		};
 
 		this.hono = new Hono<Env>();
 		this.hono
@@ -238,7 +272,7 @@ export class TweetSearch extends DurableObject {
 						newTweets = true;
 					}
 					if (newTweets) {
-						await this.state.storage.put('tweets', this.tweets);
+						await storeTweets();
 						await this.state.storage.put('scrapeCursors', this.scrapeCursors);
 					}
 
@@ -343,7 +377,7 @@ export class TweetSearch extends DurableObject {
 				console.log('[filteredTweets]', JSON.stringify(filteredTweets, null, 2));
 
 				this.tweets = [...this.tweets, ...filteredTweets];
-				await this.state.storage.put('tweets', this.tweets);
+				await storeTweets();
 
 				return new Response(null, { status: 204 });
 			})
@@ -370,7 +404,7 @@ export class TweetSearch extends DurableObject {
 							if (c.author === 'SimpsForLucy') {
 								messages.push({ role: 'assistant' as const, content: c.text });
 							} else {
-								messages.push({ role: 'system' as const, content: `${c.author}: ${c.text}` });
+								messages.push({ role: 'user' as const, content: `${c.author}: ${c.text}` });
 							}
 						}
 						const content = `@${tweet.tweet.author?.username ?? 'User'}: ${tweet.tweet.text}${tweet.thread != null ? `\n\n${tweet.thread.map((t) => `${t.author}: ${t.text}`).join('\n\n')}` : ''}`;
@@ -396,6 +430,7 @@ export class TweetSearch extends DurableObject {
 						];
 						knowledgeMessages[0].content = LUCY_INTRO_PROMPT;
 
+						console.log('[generating knowledge]');
 						const {
 							status: knowledgeStatus,
 							parsedObject: knowledgeParsedObject,
@@ -492,7 +527,7 @@ export class TweetSearch extends DurableObject {
 
 						if (lucyResponse.tweets.length === 0) {
 							this.tweets.splice(0, 1);
-							await this.state.storage.put('tweets', this.tweets);
+							await storeTweets();
 							return new Response(null, { status: 204 });
 						}
 
@@ -501,7 +536,7 @@ export class TweetSearch extends DurableObject {
 						tweet.imagePrompt = lucyResponse.image_prompt;
 						tweet.outfit = lucyResponse.outfit;
 						tweet.hairstyle = lucyResponse.hairstyle;
-						await this.state.storage.put('tweets', this.tweets);
+						await storeTweets();
 
 						return new Response(null, { status: 204 });
 					}
@@ -581,7 +616,7 @@ export class TweetSearch extends DurableObject {
 								generation.generated_images[
 									Math.floor(Math.random() * generation.generated_images.length)
 								].url;
-							await this.state.storage.put('tweets', this.tweets);
+							await storeTweets();
 							console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
 							console.log('[tweet.imageUrl]', tweet.imageUrl);
 							return new Response(null, { status: 204 });
@@ -605,7 +640,7 @@ export class TweetSearch extends DurableObject {
 						}
 
 						tweet.imageGenerationId = generationId;
-						await this.state.storage.put('tweets', this.tweets);
+						await storeTweets();
 						console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
 
 						return new Response(null, { status: 204 });
@@ -635,12 +670,12 @@ export class TweetSearch extends DurableObject {
 						if (!generated_images || generated_images.length === 0) {
 							console.error('Recreating image', imageRes);
 							tweet.imageGenerationId = undefined;
-							await this.state.storage.put('tweets', this.tweets);
+							await storeTweets();
 							return c.text('Recreating image', 500);
 						}
 
 						tweet.imageUrl = generated_images[0].url;
-						await this.state.storage.put('tweets', this.tweets);
+						await storeTweets();
 						console.log('[tweet.imageUrl]', tweet.imageUrl);
 
 						return new Response(null, { status: 204 });
@@ -701,7 +736,7 @@ export class TweetSearch extends DurableObject {
 									await tweetResponse.text()
 								);
 								this.tweets.splice(0, 1);
-								await this.state.storage.put('tweets', this.tweets);
+								await storeTweets();
 								return c.json({ error: 'Failed to send tweet' }, 500);
 							}
 
@@ -722,11 +757,11 @@ export class TweetSearch extends DurableObject {
 					}
 
 					this.tweets.splice(0, 1);
-					await this.state.storage.put('tweets', this.tweets);
+					await storeTweets();
 
 					return new Response(null, { status: 204 });
 				} catch (err) {
-					console.error('[replies error]', err);
+					console.trace('[replies error]', err);
 					return c.text('Internal server error', 500);
 				}
 			});

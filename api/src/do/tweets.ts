@@ -128,12 +128,20 @@ export class Tweets extends DurableObject {
 								`https://timeapi.io/api/timezone/coordinate?latitude=${lastTweet.scheduledTweet.location.latitude}&longitude=${lastTweet.scheduledTweet.location.longitude}`
 							);
 							if (!res.ok) {
-								console.error('Failed to fetch timezone', res.status, await res.text());
-								return c.json({ error: 'Failed to fetch timezone' }, 500);
+								localTime = dayjs.utc(lastTweet.startedAt).format('YYYY-MM-DD HH:mm:ss');
+							} else {
+								try {
+									const { timeZone } = await res.json<{ timeZone: string }>();
+									localTime = dayjs
+										.utc(lastTweet.startedAt)
+										.tz(timeZone)
+										.format('YYYY-MM-DD HH:mm:ss');
+								} catch (_err) {
+									localTime = dayjs.utc(lastTweet.startedAt).format('YYYY-MM-DD HH:mm:ss');
+								}
 							}
-							const { timeZone } = await res.json<{ timeZone: string }>();
-							localTime = dayjs.utc(lastTweet.startedAt).tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
 						}
+						console.log('[localTime]', localTime);
 
 						const history = this.historicTweets.map(
 							(tweet) =>
@@ -154,11 +162,15 @@ export class Tweets extends DurableObject {
 									`https://timeapi.io/api/timezone/coordinate?latitude=${this.nextLocation.latitude}&longitude=${this.nextLocation.longitude}`
 								);
 								if (!res.ok) {
-									console.error('Failed to fetch timezone', res.status, await res.text());
-									return c.json({ error: 'Failed to fetch timezone' }, 500);
+									localTime = dayjs.utc().format('YYYY-MM-DD HH:mm:ss');
+								} else {
+									try {
+										const { timeZone } = await res.json<{ timeZone: string }>();
+										localTime = dayjs.utc().tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
+									} catch (_err) {
+										localTime = dayjs.utc().format('YYYY-MM-DD HH:mm:ss');
+									}
 								}
-								const { timeZone } = await res.json<{ timeZone: string }>();
-								localTime = dayjs.utc().tz(timeZone).format('YYYY-MM-DD HH:mm:ss');
 							}
 						}
 						if (this.nextLocation != null && this.schedule != null) {
@@ -207,6 +219,7 @@ export class Tweets extends DurableObject {
 						});
 					}
 
+					console.log('[generating scheduled tweet]', JSON.stringify(messages, null, 2));
 					const { status, parsedObject, errorMessage } = await chatCompletion(
 						this.env,
 						messages,

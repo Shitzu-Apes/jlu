@@ -98,25 +98,25 @@ export default {
 				);
 				break;
 			case '* * * * *':
-				await Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]);
+				ctx.waitUntil(Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]));
 				break;
 			case '*/3 * * * *':
-				await scrapeLucy(env, ctx);
+				ctx.waitUntil(scrapeLucy(env, ctx));
 				break;
 			case '15 * * * *':
-				await searchAiAgentsTweets(env, ctx);
+				ctx.waitUntil(searchAiAgentsTweets(env, ctx));
 				break;
 			case '40 * * * *':
-				await searchNearTweets(env, ctx);
+				ctx.waitUntil(searchNearTweets(env, ctx));
 				break;
 			case '45 * * * *':
-				await searchEthDenverTweets(env, ctx);
+				ctx.waitUntil(searchEthDenverTweets(env, ctx));
 				break;
 			case '50 * * * *':
-				await searchSimpsTweets(env, ctx);
+				ctx.waitUntil(searchSimpsTweets(env, ctx));
 				break;
 			case '30 * * * *':
-				await updateNearKnowledge(env, ctx);
+				ctx.waitUntil(updateNearKnowledge(env, ctx));
 				break;
 		}
 	}
