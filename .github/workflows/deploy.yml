@@ -28,13 +28,13 @@ jobs:
         run: echo "VITE_API_URL=https://api.juicylucy.ai" >> .env
 
       - name: Build step
-        run: 'yarn build'
+        run: 'yarn app build'
 
       - name: Lint
         run: 'yarn lint'
 
       - name: Svelte Check
-        run: 'yarn run check'
+        run: 'yarn app run check'
 
       - name: Upload to Cloudflare Pages
         run: yarn wrangler pages deploy --project-name juicy-lucy app/.svelte-kit/cloudflare
