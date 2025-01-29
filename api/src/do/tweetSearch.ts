@@ -383,6 +383,7 @@ export class TweetSearch extends DurableObject {
 			})
 			.get('/replies', async (c) => {
 				try {
+					console.log('[replies] Remaining tweets', this.tweets.length);
 					const tweet = this.tweets[0];
 
 					if (tweet == null) {

@@ -88,6 +88,27 @@ export async function chatCompletion<
 	if (tokens > 8192) {
 		model = 'deepseek-chat';
 	}
+	console.log('[model]', model);
+
+	if (model === 'deepseek-chat' || model === 'deepseek-reasoner') {
+		// TODO deepseek down?
+		const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+		const response = await openai.beta.chat.completions.parse({
+			model: 'gpt-4o-mini',
+			messages,
+			response_format: zodResponseFormat(zodObject, 'json_object')
+		});
+		const parsedObject = zodObject.safeParse(
+			response.choices[0].message.parsed
+		) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
+
+		return {
+			status: 'success' as const,
+			parsedObject,
+			rawResponse: ''
+		};
+	}
+
 	const response = await match(model)
 		.with('llama-3.3-70b', () =>
 			fetch(`${env.CEREBRAS_API_URL}/v1/chat/completions`, {
@@ -106,29 +127,32 @@ export async function chatCompletion<
 				})
 			})
 		)
-		.with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
-			fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
-					'Content-Type': 'application/json',
-					'User-Agent': 'SimpsForLucy'
-				},
-				body: JSON.stringify({
-					model,
-					messages,
-					max_tokens: maxTokens,
-					temperature,
-					response_format: responseFormat
-				})
-			})
-		)
+		// .with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
+		// 	fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
+		// 		method: 'POST',
+		// 		headers: {
+		// 			Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+		// 			'Content-Type': 'application/json',
+		// 			'User-Agent': 'SimpsForLucy'
+		// 		},
+		// 		body: JSON.stringify({
+		// 			model,
+		// 			messages,
+		// 			max_tokens: maxTokens,
+		// 			temperature,
+		// 			response_format: responseFormat
+		// 		})
+		// 	})
+		// )
 		.exhaustive();
 	if (!response.ok) {
-		return { status: 'error' as const, errorMessage: await response.text() } as const;
+		const text = await response.text();
+		console.error('[completion error]', text);
+		return { status: 'error' as const, errorMessage: text } as const;
 	}
 
 	const completion = await response.json<OpenAIResponse>();
+	console.log('[completion]', completion);
 	try {
 		const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
 		let parsedObject = zodObject.safeParse(rawResponse) as z.SafeParseReturnType<

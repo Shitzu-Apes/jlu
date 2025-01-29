@@ -419,7 +419,7 @@ export class Tweets extends DurableObject {
 			.get('/next', async (c) => {
 				return c.json(dayjs(this.nextTweetTimestamp).toISOString());
 			})
-			.get('/schedule', async (c) => {
+			.get('/current-schedule', async (c) => {
 				return c.json(this.schedule);
 			})
 			.get('/next-location', async (c) => {
