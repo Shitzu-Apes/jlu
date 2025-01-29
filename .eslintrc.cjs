@@ -7,8 +7,7 @@ module.exports = {
 		'plugin:import/typescript',
 		'plugin:prettier/recommended',
 		'plugin:@typescript-eslint/eslint-recommended',
-		'plugin:@typescript-eslint/recommended',
-		'plugin:svelte/recommended'
+		'plugin:@typescript-eslint/recommended'
 	],
 	plugins: ['@typescript-eslint', 'prettier', 'import'],
 	parserOptions: {
@@ -16,8 +15,7 @@ module.exports = {
 		sourceType: 'module',
 		ecmaFeatures: {
 			arrowFunctions: true
-		},
-		extraFileExtensions: ['.svelte']
+		}
 	},
 	env: {
 		browser: true,
@@ -35,19 +33,6 @@ module.exports = {
 			}
 		}
 	},
-	overrides: [
-		{
-			files: ['*.svelte'],
-			parser: 'svelte-eslint-parser',
-			parserOptions: {
-				parser: '@typescript-eslint/parser'
-			},
-			rules: {
-				'svelte/valid-compile': ['off'],
-				'svelte/html-self-closing': ['error']
-			}
-		}
-	],
 	rules: {
 		'no-case-declarations': 'off',
 		'import/order': [
