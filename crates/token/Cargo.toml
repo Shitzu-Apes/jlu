@@ -12,6 +12,12 @@ crate-type = ["cdylib", "rlib"]
 near-contract-standards.workspace = true
 near-sdk.workspace = true
 
+[dev-dependencies]
+anyhow.workspace = true
+near-workspaces.workspace = true
+owo-colors.workspace = true
+tokio = { workspace = true, features = ["full"] }
+
 # fields to configure build with WASM reproducibility, according to specs  
 # in https://github.com/near/NEPs/blob/master/neps/nep-0330.md 
 [package.metadata.near.reproducible_build]

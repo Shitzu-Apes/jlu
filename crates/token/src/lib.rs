@@ -20,7 +20,11 @@ pub enum StorageKey {
     Token,
 }
 
-#[near_bindgen(contract_metadata(standard(standard = "nep148", version = "1.0.0")))]
+#[near_bindgen(contract_metadata(
+    standard(standard = "nep141", version = "1.0.0"),
+    standard(standard = "nep145", version = "1.0.0"),
+    standard(standard = "nep148", version = "1.0.0")
+))]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 #[borsh(crate = "near_sdk::borsh")]
 pub struct Contract {
