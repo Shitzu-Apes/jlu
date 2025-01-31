@@ -29,7 +29,16 @@ export async function fetchApi(
 		console.log('[api] Session expired, clearing auth');
 		localStorage.removeItem('auth');
 		session$.set(Promise.resolve(undefined));
-		showToast('Session expired. Please login again.');
+		showToast({
+			data: {
+				type: 'simple',
+				data: {
+					title: 'Session expired',
+					description: 'Please login again.',
+					type: 'error'
+				}
+			}
+		});
 		throw new Error('Session expired');
 	}
 

@@ -1,6 +1,10 @@
 import { writable } from 'svelte/store';
 
-import { fetchApi } from './api';
+import { fetchApi } from '../api';
+
+import WalletSelector from './WalletSelector.svelte';
+
+import { openBottomSheet } from '$lib/layout/BottomSheet/Container.svelte';
 
 export type Auth = {
 	expires_at: number;
@@ -17,6 +21,10 @@ export type Auth = {
 		username: string;
 	};
 };
+
+export async function showWalletSelector() {
+	openBottomSheet(WalletSelector);
+}
 
 export const session$ = writable<Promise<Auth | undefined>>(new Promise<never>(() => undefined));
 

@@ -233,7 +233,16 @@
 
 			if (!response.ok) {
 				const reason = await response.text();
-				showToast(reason);
+				showToast({
+					data: {
+						type: 'simple',
+						data: {
+							title: 'Error',
+							description: reason,
+							type: 'error'
+						}
+					}
+				});
 				console.error('Failed to send message:', reason);
 				return;
 			}

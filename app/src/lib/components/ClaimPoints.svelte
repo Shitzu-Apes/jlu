@@ -21,18 +21,44 @@
 				body: { walletAddress }
 			});
 			if (!response.ok) {
-				showToast(`Failed to claim points. ${await response.text()}`);
+				showToast({
+					data: {
+						type: 'simple',
+						data: {
+							title: 'Error',
+							description: `Failed to claim points. ${await response.text()}`
+						}
+					}
+				});
 				return;
 			}
 
 			const { tweetUrl } = await response.json<{ tweetUrl: string }>();
-			showToast('Points claimed successfully! Check your wallet soon.', 'success');
+			showToast({
+				data: {
+					type: 'simple',
+					data: {
+						title: 'Success',
+						description: 'Points claimed successfully! Check your wallet soon.',
+						type: 'success'
+					}
+				}
+			});
 			onClaim();
 			window.open(tweetUrl, '_blank');
 			closeBottomSheet();
 		} catch (err) {
 			console.error('Error claiming points:', err);
-			showToast('Failed to claim points. Please try again later.');
+			showToast({
+				data: {
+					type: 'simple',
+					data: {
+						title: 'Error',
+						description: 'Failed to claim points. Please try again later.',
+						type: 'error'
+					}
+				}
+			});
 		} finally {
 			isSubmitting = false;
 		}

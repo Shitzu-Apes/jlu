@@ -1,75 +1,146 @@
-<script context="module" lang="ts">
-	import { createToaster } from '@melt-ui/svelte';
-
-	type ToastData = {
-		title: string;
-		description: string;
-		type: 'error' | 'success';
-	};
+<script lang="ts" context="module">
+	export type ToastType =
+		| {
+				type: 'simple';
+				data: {
+					title: string;
+					description: string;
+					type?: 'error' | 'success';
+				};
+		  }
+		| {
+				type: 'tx';
+				canClose: boolean;
+				props: {
+					txPromise:
+						| Promise<FinalExecutionOutcome>
+						| Promise<void | FinalExecutionOutcome | FinalExecutionOutcome[]>;
+				};
+				success?: boolean;
+		  };
 
 	const {
 		elements: { content, title, description, close },
+		helpers,
 		states: { toasts },
-		helpers: { addToast }
-	} = createToaster<ToastData>();
+		actions: { portal }
+	} = createToaster<ToastType>();
 
-	export function showToast(message: string, type: 'error' | 'success' = 'error') {
-		addToast({
+	export const showToast = helpers.addToast;
+
+	export function showTxToast(
+		txPromise:
+			| Promise<void | FinalExecutionOutcome | FinalExecutionOutcome[]>
+			| Promise<FinalExecutionOutcome>
+	) {
+		const toast = helpers.addToast({
 			data: {
-				title: type === 'error' ? 'Error' : 'Success',
-				description: message,
-				type
-			}
+				type: 'tx',
+				canClose: false,
+				props: {
+					txPromise
+				}
+			},
+			closeDelay: 0
 		});
+		txPromise
+			.then((outcome) => {
+				if (!(outcome instanceof Object)) return;
+				let success = true;
+				if (Array.isArray(outcome)) {
+					if (outcome.find((o) => !isOutcomeSuccess(o))) {
+						success = false;
+					}
+				} else {
+					success = isOutcomeSuccess(outcome);
+				}
+				helpers.updateToast(toast.id, {
+					type: 'tx',
+					canClose: true,
+					props: { txPromise },
+					success
+				});
+			})
+			.catch(() => {
+				helpers.updateToast(toast.id, {
+					type: 'tx',
+					canClose: true,
+					props: { txPromise },
+					success: false
+				});
+			})
+			.finally(() => {
+				setTimeout(() => {
+					try {
+						helpers.removeToast(toast.id);
+					} catch (_err) {
+						// already removed
+					}
+				}, 8_000);
+			});
+	}
+
+	function isOutcomeSuccess(outcome: FinalExecutionOutcome): boolean {
+		const outcomeStatus = outcome.transaction_outcome.outcome.status as ExecutionStatus;
+		if (!outcomeStatus.SuccessValue && !outcomeStatus.SuccessReceiptId) {
+			return false;
+		}
+
+		for (const receiptsOutcome of outcome.receipts_outcome) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const receiptStatus = receiptsOutcome.outcome.status as any;
+			if (receiptStatus.Failure) {
+				return false;
+			}
+		}
+		return true;
 	}
 </script>
 
 <script lang="ts">
-	import { melt } from '@melt-ui/svelte';
-	import { slide } from 'svelte/transition';
+	import { createToaster, melt } from '@melt-ui/svelte';
+	import type { ExecutionStatus } from '@near-js/types';
+	import type { FinalExecutionOutcome } from '@near-wallet-selector/core';
+	import { fly, slide } from 'svelte/transition';
+
+	import TxSnackbar from './TxSnackbar.svelte';
 </script>
 
-<div
-	use:melt={$content}
-	class="fixed top-4 right-4 flex flex-col gap-4 w-[400px] max-w-[100vw-2rem] z-[100]"
->
+<div use:portal class="fixed left-1/2 top-4 z-50 -translate-x-1/2 flex flex-col items-center gap-2">
 	{#each $toasts as { id, data } (id)}
 		<div
-			transition:slide={{ duration: 150 }}
-			class="bg-white dark:bg-zinc-800 p-4 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700"
+			use:melt={$content(id)}
+			in:fly={{ y: '-100%', duration: 300 }}
+			out:slide
+			class="relative rounded-lg bg-gray-800 text-white border border-gray-700 shadow-lg"
 		>
-			<div class="flex items-start gap-4">
-				<div class="flex-1">
-					<div
-						use:melt={$title(id)}
-						class:text-red-500={data.type === 'error'}
-						class:text-green-500={data.type === 'success'}
-						class="font-semibold"
-					>
-						{data.title}
+			<div class="relative flex w-80 items-center gap-3 p-3">
+				{#if data.type === 'simple'}
+					<div>
+						<h3
+							use:melt={$title(id)}
+							class="flex items-center gap-2 text-sm font-semibold"
+							class:text-red-500={data.data.type === 'error'}
+							class:text-green-500={data.data.type === 'success'}
+						>
+							{data.data.title}
+						</h3>
+						<div use:melt={$description(id)} class="text-sm text-gray-300">
+							{data.data.description}
+						</div>
 					</div>
-					<div use:melt={$description(id)} class="text-zinc-600 dark:text-zinc-300 text-sm mt-1">
-						{data.description}
-					</div>
-				</div>
-				<button
-					use:melt={$close(id)}
-					type="button"
-					aria-label="Close notification"
-					class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
+				{:else if data.type === 'tx'}
+					<TxSnackbar {...data.props} />
+				{/if}
+				{#if data.type === 'simple' || data.canClose}
+					<button
+						use:melt={$close(id)}
+						class="absolute right-2 top-2 grid size-5 place-items-center rounded-md text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+						aria-label="Close"
 					>
-				</button>
+						<div class="i-mdi:close size-3" />
+					</button>
+				{/if}
 			</div>
 		</div>
 	{/each}

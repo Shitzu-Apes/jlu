@@ -25,7 +25,16 @@
 
 			const error = url.searchParams.get('error');
 			if (error) {
-				showToast(error);
+				showToast({
+					data: {
+						type: 'simple',
+						data: {
+							title: 'Login failed',
+							description: error,
+							type: 'error'
+						}
+					}
+				});
 				url.searchParams.delete('error');
 				url.searchParams.delete('state');
 				goto(url.href, { replaceState: true, noScroll: true });
@@ -49,7 +58,16 @@
 					if (!res.ok) {
 						const error = await res.text();
 						console.error('auth failed', res.status, error);
-						showToast('Login failed. Please try again later.');
+						showToast({
+							data: {
+								type: 'simple',
+								data: {
+									title: 'Login failed',
+									description: 'Please try again later.',
+									type: 'error'
+								}
+							}
+						});
 						return;
 					}
 					return res.json<Auth>();
@@ -57,7 +75,16 @@
 				.then((auth) => {
 					if (!auth) return;
 					if (!auth.token || !auth.user) {
-						showToast('Login failed. Please try again later.');
+						showToast({
+							data: {
+								type: 'simple',
+								data: {
+									title: 'Login failed',
+									description: 'Please try again later.',
+									type: 'error'
+								}
+							}
+						});
 						return;
 					}
 					localStorage.setItem('auth', JSON.stringify(auth));
