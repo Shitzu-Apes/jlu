@@ -9,6 +9,7 @@
 	import { session$, type Auth } from '$lib/auth';
 	import Toast, { showToast } from '$lib/components/Toast.svelte';
 	import { BottomSheet } from '$lib/layout/BottomSheet';
+	import Header from '$lib/layout/Header.svelte';
 
 	// eslint-disable-next-line import/no-named-as-default-member
 	dayjs.extend(relativeTime);
@@ -150,7 +151,10 @@
 	});
 </script>
 
-<slot />
+<div class="flex flex-col w-full h-screen overflow-hidden bg-zinc-950 text-white">
+	<Header />
+	<slot />
+</div>
 
 <Toast />
 
