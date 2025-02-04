@@ -32,10 +32,12 @@ export abstract class Ft {
 	}
 
 	public static async ft_transfer_call(
-		tokenId: string,
-		receiverId: string,
-		amount: string,
-		memo: string,
+		{
+			tokenId,
+			receiverId,
+			amount,
+			memo
+		}: { tokenId: string; receiverId: string; amount: string; memo: string },
 		callback: TransactionCallbacks<FinalExecutionOutcome> = {}
 	) {
 		return wallet.signAndSendTransaction(

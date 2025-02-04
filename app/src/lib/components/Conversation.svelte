@@ -352,14 +352,16 @@
 
 							<button
 								on:click={handleOpenHowItWorks}
-								class="w-full max-w-md flex-col items-center gap-4 px-8 py-6 bg-purple-900/90 hover:bg-purple-900/80 rounded-xl transition-colors hidden md:flex"
+								class="w-full max-w-md flex flex-col items-center gap-2 md:gap-4 px-4 md:px-8 py-3 md:py-6 bg-purple-900/90 hover:bg-purple-900/80 rounded-xl transition-colors"
 							>
 								<div
-									class="i-mdi:lightbulb text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
+									class="i-mdi:lightbulb text-2xl md:text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
 								/>
 								<div class="text-center">
-									<div class="text-lg font-medium text-purple-100">New to Simp2Earn?</div>
-									<div class="text-sm text-purple-200/70 mt-1">
+									<div class="text-base md:text-lg font-medium text-purple-100">
+										New to Simp2Earn?
+									</div>
+									<div class="text-xs md:text-sm text-purple-200/70 mt-0.5 md:mt-1 hidden md:block">
 										Learn how to earn tokens by chatting with Lucy
 									</div>
 								</div>
@@ -480,14 +482,18 @@
 							<div class="flex flex-col items-center justify-center py-12">
 								<button
 									on:click={handleOpenHowItWorks}
-									class="flex flex-col items-center gap-4 px-8 py-6 bg-purple-900/20 hover:bg-purple-900/30 rounded-2xl transition-colors group"
+									class="flex flex-col items-center gap-2 md:gap-4 px-4 md:px-8 py-3 md:py-6 bg-purple-900/20 hover:bg-purple-900/30 rounded-2xl transition-colors group"
 								>
 									<div
-										class="i-mdi:lightbulb text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
+										class="i-mdi:lightbulb text-2xl md:text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
 									/>
 									<div class="text-center">
-										<div class="text-lg font-medium text-purple-100">New to Simp2Earn?</div>
-										<div class="text-sm text-purple-200/70 mt-1">
+										<div class="text-base md:text-lg font-medium text-purple-100">
+											New to Simp2Earn?
+										</div>
+										<div
+											class="text-xs md:text-sm text-purple-200/70 mt-0.5 md:mt-1 hidden md:block"
+										>
 											Learn how to earn tokens by chatting with Lucy
 										</div>
 									</div>
@@ -502,14 +508,18 @@
 								<div class="flex flex-col items-center justify-center py-12">
 									<button
 										on:click={handleOpenHowItWorks}
-										class="flex flex-col items-center gap-4 px-8 py-6 bg-purple-900/20 hover:bg-purple-900/30 rounded-2xl transition-colors group"
+										class="flex flex-col items-center gap-2 md:gap-4 px-4 md:px-8 py-3 md:py-6 bg-purple-900/20 hover:bg-purple-900/30 rounded-2xl transition-colors group"
 									>
 										<div
-											class="i-mdi:lightbulb text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
+											class="i-mdi:lightbulb text-2xl md:text-4xl text-purple-200/70 group-hover:text-purple-200 transition-colors"
 										/>
 										<div class="text-center">
-											<div class="text-lg font-medium text-purple-100">New to Simp2Earn?</div>
-											<div class="text-sm text-purple-200/70 mt-1">
+											<div class="text-base md:text-lg font-medium text-purple-100">
+												New to Simp2Earn?
+											</div>
+											<div
+												class="text-xs md:text-sm text-purple-200/70 mt-0.5 md:mt-1 hidden md:block"
+											>
 												Learn how to earn tokens by chatting with Lucy
 											</div>
 										</div>
