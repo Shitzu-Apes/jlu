@@ -27,6 +27,14 @@
 			>
 				Migrate
 			</a>
+			<a
+				href="/bridge"
+				class="px-3 sm:px-4 py-1.5 rounded-lg {$page.url.pathname === '/bridge'
+					? 'bg-purple-900/40 text-purple-100'
+					: 'hover:bg-purple-900/20 text-purple-200/70 hover:text-purple-100'} transition-colors text-sm"
+			>
+				Bridge
+			</a>
 		</nav>
 	</div>
 	<div class="flex items-center gap-2 sm:gap-4">

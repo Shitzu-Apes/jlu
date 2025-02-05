@@ -26,6 +26,7 @@
 		"@wagmi/core": "^2.16.3",
 		"@web3modal/wagmi": "^5.1.11",
 		"dayjs": "^1.11.13",
+		"omni-bridge-sdk": "^0.3.0",
 		"ts-pattern": "^5.5.0",
 		"wagmi": "^2.14.9"
 	},
