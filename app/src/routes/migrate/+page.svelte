@@ -57,8 +57,8 @@
 	}
 </script>
 
-<main class="flex-1 flex flex-col items-center justify-center p-4">
-	<div class="w-full max-w-2xl space-y-8">
+<main class="w-full max-w-2xl mx-auto py-8 px-4">
+	<div class="space-y-8">
 		<div class="text-center space-y-4">
 			<h1 class="text-4xl font-bold text-purple-100">Token Migration</h1>
 			<p class="text-lg text-purple-200/70">Migrate your existing JLU tokens to the new contract</p>
@@ -67,7 +67,7 @@
 		{#if $account$}
 			<div class="bg-purple-900/20 rounded-xl p-6 space-y-6">
 				<div class="space-y-2">
-					<h2 class="text-xl font-semibold">Your Balance</h2>
+					<div class="text-sm text-purple-200/70">Your Balance</div>
 					{#if $oldBalance$}
 						<p class="text-2xl font-medium">{$oldBalance$.format()} JLU</p>
 					{:else}
