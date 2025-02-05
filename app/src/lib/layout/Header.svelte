@@ -31,7 +31,7 @@
 	</div>
 	<div class="flex items-center gap-2 sm:gap-4">
 		{#if $jluBalance$}
-			<div class="flex items-center gap-2 text-sm text-purple-200/70">
+			<div class="hidden md:flex items-center gap-2 text-sm text-purple-200/70">
 				<img src="/logo.webp" alt="JLU" class="w-5 h-5 rounded-full" />
 				<span class="font-medium text-purple-100"
 					>{$jluBalance$.format({

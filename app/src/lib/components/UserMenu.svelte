@@ -4,6 +4,7 @@
 	import { clickOutside } from '$lib/actions';
 	import { showWalletSelector } from '$lib/auth';
 	import { wallet } from '$lib/near';
+	import { jluBalance$ } from '$lib/near/jlu';
 
 	const { accountId$, iconUrl$, walletName$, isLoading$ } = wallet;
 
@@ -36,7 +37,7 @@
 
 		{#if isOpen}
 			<div
-				class="absolute right-0 top-full mt-2 w-72 bg-zinc-900 rounded-xl border border-purple-900/20 shadow-lg py-2 z-50"
+				class="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-72 max-w-[20rem] bg-zinc-900 rounded-xl border border-purple-900/20 shadow-lg py-2 z-50"
 			>
 				{#await Promise.all( [$iconUrl$, $walletName$, $accountId$] ) then [iconUrl, walletName, accountId]}
 					<div class="px-4 py-2 border-b border-purple-900/20">
@@ -51,6 +52,19 @@
 							<div class="flex-1 min-w-0">
 								<div class="text-sm font-medium text-purple-100">{walletName}</div>
 								<div class="text-sm text-purple-200/70 truncate">{accountId}</div>
+								{#if $jluBalance$}
+									<div class="flex items-center gap-2 text-sm text-purple-200/70 mt-1 md:hidden">
+										<img src="/logo.webp" alt="JLU" class="w-4 h-4 rounded-full" />
+										<span class="font-medium text-purple-100"
+											>{$jluBalance$.format({
+												compactDisplay: 'short',
+												notation: 'compact',
+												maximumFractionDigits: 2
+											})}</span
+										>
+										<span>JLU</span>
+									</div>
+								{/if}
 							</div>
 						</div>
 					</div>
