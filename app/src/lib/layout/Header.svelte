@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import UserMenu from '$lib/components/UserMenu.svelte';
-	import { jluBalanceAuto$ } from '$lib/near/jlu';
+	import { jluBalance$ } from '$lib/near/jlu';
 </script>
 
 <header
@@ -30,15 +30,18 @@
 		</nav>
 	</div>
 	<div class="flex items-center gap-2 sm:gap-4">
-		{#await $jluBalanceAuto$ then balance}
-			{#if balance}
-				<div class="flex items-center gap-2 text-sm text-purple-200/70">
-					<img src="/logo.webp" alt="JLU" class="w-5 h-5 rounded-full" />
-					<span class="font-medium text-purple-100">{balance.format()}</span>
-					<span class="hidden sm:inline">JLU</span>
-				</div>
-			{/if}
-		{/await}
+		{#if $jluBalance$}
+			<div class="flex items-center gap-2 text-sm text-purple-200/70">
+				<img src="/logo.webp" alt="JLU" class="w-5 h-5 rounded-full" />
+				<span class="font-medium text-purple-100"
+					>{$jluBalance$.format({
+						compactDisplay: 'short',
+						notation: 'compact',
+						maximumFractionDigits: 2
+					})}</span
+				>
+			</div>
+		{/if}
 		<UserMenu />
 	</div>
 </header>

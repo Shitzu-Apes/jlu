@@ -115,8 +115,9 @@ export class Wallet {
 						{ setupEthereumWallets },
 						{ createWeb3Modal },
 						{ setupOneClickConnect }
-					]) =>
-						setupWalletSelector({
+					]) => {
+						this.isLoading$.set(false);
+						return setupWalletSelector({
 							network: import.meta.env.VITE_NETWORK_ID,
 							modules: [
 								setupMeteorWallet(),
@@ -158,11 +159,14 @@ export class Wallet {
 									// eslint-disable-next-line @typescript-eslint/no-explicit-any
 								}) as any
 							]
-						})
+						});
+					}
 				)
 			: // eslint-disable-next-line @typescript-eslint/no-empty-function
 				new Promise<never>(() => {})
 	);
+
+	public isLoading$ = writable(true);
 
 	private _account$ = writable<Account | undefined>();
 	public account$ = derived(this._account$, (a) => a);

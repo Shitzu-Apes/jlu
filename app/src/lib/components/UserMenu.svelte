@@ -1,9 +1,11 @@
 <script lang="ts">
+	import Button from './Button.svelte';
+
 	import { clickOutside } from '$lib/actions';
 	import { showWalletSelector } from '$lib/auth';
 	import { wallet } from '$lib/near';
 
-	const { accountId$, iconUrl$, walletName$ } = wallet;
+	const { accountId$, iconUrl$, walletName$, isLoading$ } = wallet;
 
 	let isOpen = false;
 
@@ -15,9 +17,11 @@
 
 {#if $accountId$}
 	<div class="relative" use:clickOutside={() => (isOpen = false)}>
-		<button
-			on:click={() => (isOpen = !isOpen)}
-			class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-purple-900/20 transition-colors"
+		<Button
+			type="secondary"
+			size="s"
+			onClick={() => (isOpen = !isOpen)}
+			class="!px-2"
 			aria-label="Wallet menu"
 		>
 			{#await Promise.all([$iconUrl$, $walletName$]) then [iconUrl, walletName]}
@@ -28,7 +32,7 @@
 				/>
 				<div class="i-mdi:chevron-down text-lg text-purple-200/70" />
 			{/await}
-		</button>
+		</Button>
 
 		{#if isOpen}
 			<div
@@ -50,27 +54,26 @@
 							</div>
 						</div>
 					</div>
-					<div class="py-1">
-						<button
-							on:click={handleSignOut}
-							class="w-full px-4 py-2 text-left text-sm text-purple-200/70 hover:bg-purple-900/20 transition-colors flex items-center gap-2"
+					<div class="px-2 py-1">
+						<Button
+							type="secondary"
+							size="s"
+							onClick={handleSignOut}
+							class="w-full !justify-start !px-4"
 						>
 							<div class="i-mdi:logout text-xl" />
-							Disconnect Wallet
-						</button>
+							<span class="ml-2">Disconnect Wallet</span>
+						</Button>
 					</div>
 				{/await}
 			</div>
 		{/if}
 	</div>
 {:else}
-	<button
-		class="px-4 py-2 rounded-xl bg-purple-600/80 hover:bg-purple-500/80 text-white font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-		on:click={showWalletSelector}
-	>
+	<Button size="m" onClick={showWalletSelector} loading={$isLoading$}>
 		<span class="block md:hidden">Connect</span>
 		<span class="hidden md:block">Connect Wallet</span>
-	</button>
+	</Button>
 {/if}
 
 <style>
