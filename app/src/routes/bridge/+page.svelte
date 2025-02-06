@@ -154,11 +154,11 @@
 				const publicKey = $publicKey$?.toBase58();
 				if (!publicKey) return;
 
-				const provider = new AnchorProvider(
-					solanaWallet.getConnection(),
-					solanaWallet.getAnchorWallet()
-				);
-
+				const provider = solanaWallet.getProvider();
+				if (!provider) {
+					console.error('Provider not connected.');
+					return;
+				}
 				const client = getClient(ChainKind.Sol, provider);
 
 				const sender = omniAddress(ChainKind.Sol, publicKey);
@@ -366,7 +366,7 @@
 			<Button
 				onClick={handleBridge}
 				loading={$isLoading$}
-				disabled={!needsWalletConnection && !canBridge}
+				disabled={false}
 				class="w-full"
 			>
 				{#if needsWalletConnection}

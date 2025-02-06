@@ -2,6 +2,8 @@ import type { SignerWalletAdapter } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, Connection, type PublicKey } from '@solana/web3.js';
 import { derived, get, writable } from 'svelte/store';
+import { AnchorProvider, type Provider } from '@coral-xyz/anchor'; // Import AnchorProvider
+import { browser } from '$app/environment'; // For SvelteKit
 
 import { showToast } from '$lib/components/Toast.svelte';
 
@@ -11,9 +13,10 @@ const connection = new Connection(endpoint);
 
 class SolanaWallet {
 	private _wallets$ = writable<SignerWalletAdapter[]>([]);
-	private _selectedWallet$ = writable<SignerWalletAdapter | undefined>();
+	private _selectedWallet$ = writable<SignerWalletAdapter | undefined>(undefined);
 	private _publicKey$ = writable<PublicKey | undefined>();
 	private _isAutoConnecting$ = writable(false);
+	private _provider: Provider | null = null; // Add a provider instance variable
 
 	constructor() {
 		const wallets = [new PhantomWalletAdapter(), new SolflareWalletAdapter()];
@@ -27,6 +30,7 @@ class SolanaWallet {
 			wallet.on('connect', () => {
 				this._selectedWallet$.set(wallet);
 				this._publicKey$.set(wallet.publicKey ?? undefined);
+				this.updateProvider(); // Update provider on connect
 			});
 
 			wallet.on('disconnect', () => {
@@ -34,6 +38,7 @@ class SolanaWallet {
 				if (current?.name === wallet.name) {
 					this._selectedWallet$.set(undefined);
 					this._publicKey$.set(undefined);
+					this.updateProvider(); // Update provider on disconnect
 				}
 			});
 		});
@@ -73,6 +78,7 @@ class SolanaWallet {
 			await wallet.connect();
 			this._selectedWallet$.set(wallet);
 			this._publicKey$.set(wallet.publicKey ?? undefined);
+			this.updateProvider(); // <--- VERY IMPORTANT
 
 			showToast({
 				data: {
@@ -115,8 +121,10 @@ class SolanaWallet {
 					}
 				}
 			});
+
 			this._selectedWallet$.set(undefined);
 			this._publicKey$.set(undefined);
+			this.updateProvider(); // <--- VERY IMPORTANT
 		} catch (error) {
 			console.error('Failed to disconnect wallet:', error);
 			showToast({
@@ -133,19 +141,37 @@ class SolanaWallet {
 		}
 	}
 
+	private updateProvider() {
+		if (browser) {
+			// Check for browser environment.
+			const wallet = get(this._selectedWallet$);
+			if (wallet && wallet.publicKey) {
+				this._provider = new AnchorProvider(
+					connection,
+					{
+						signTransaction: wallet.signTransaction.bind(wallet),
+						signAllTransactions: wallet.signAllTransactions.bind(wallet),
+						publicKey: wallet.publicKey
+					},
+					AnchorProvider.defaultOptions()
+				);
+			} else {
+				this._provider = null;
+			}
+		} else {
+			// if not in browser, set to null.
+			this._provider = null;
+		}
+	}
+
+	public getProvider(): Provider | null {
+		return this._provider;
+	}
+
 	public getConnection() {
 		return connection;
 	}
-
-	public getAnchorWallet() {
-		const wallet = get(this._selectedWallet$);
-		if (!wallet) throw new Error('No wallet selected');
-		return {
-			signTransaction: wallet.signTransaction,
-			signAllTransactions: wallet.signAllTransactions,
-			publicKey: wallet.publicKey as PublicKey
-		};
-	}
+	// Remove the getAnchorWallet(), replace with getProvider()
 }
 
 export const solanaWallet = new SolanaWallet();
