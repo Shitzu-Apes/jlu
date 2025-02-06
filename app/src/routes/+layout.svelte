@@ -156,7 +156,7 @@
 
 <div class="flex flex-col w-full h-screen overflow-hidden bg-zinc-950 text-white">
 	<Header />
-	<div class="flex-1 overflow-y-auto">
+	<div class="flex flex-1 overflow-y-auto">
 		<slot />
 	</div>
 </div>
