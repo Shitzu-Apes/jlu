@@ -2,6 +2,7 @@
 	import dayjs from 'dayjs';
 	import duration from 'dayjs/plugin/duration';
 	import relativeTime from 'dayjs/plugin/relativeTime';
+	import { setNetwork } from 'omni-bridge-sdk';
 	import { onMount } from 'svelte';
 
 	import { goto } from '$app/navigation';
@@ -15,6 +16,8 @@
 	dayjs.extend(relativeTime);
 	// eslint-disable-next-line import/no-named-as-default-member
 	dayjs.extend(duration);
+
+	setNetwork(import.meta.env.VITE_NETWORK_ID);
 
 	import '@unocss/reset/tailwind.css';
 	import 'virtual:uno.css';

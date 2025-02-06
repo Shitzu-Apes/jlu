@@ -50,6 +50,22 @@
 		destinationNetwork$.set(source);
 	}
 
+	function handleSourceNetworkChange(network: Network) {
+		if (network === $destinationNetwork$) {
+			// If selecting same network as destination, swap them
+			destinationNetwork$.set($sourceNetwork$);
+		}
+		sourceNetwork$.set(network);
+	}
+
+	function handleDestinationNetworkChange(network: Network) {
+		if (network === $sourceNetwork$) {
+			// If selecting same network as source, swap them
+			sourceNetwork$.set($destinationNetwork$);
+		}
+		destinationNetwork$.set(network);
+	}
+
 	function handleMaxAmount() {
 		const currentBalance = $sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana;
 		if (currentBalance) {
@@ -104,7 +120,7 @@
 		}
 
 		const amount = $amount$.toU128();
-		const api = new OmniBridgeAPI(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet');
+		const api = new OmniBridgeAPI();
 
 		const transferEvent = await match($sourceNetwork$)
 			.with('near', async () => {
@@ -250,7 +266,7 @@
 							network.id
 								? 'bg-purple-900/40 border-purple-500/50'
 								: 'hover:bg-purple-900/30'} transition-colors"
-							on:click={() => sourceNetwork$.set(network.id)}
+							on:click={() => handleSourceNetworkChange(network.id)}
 						>
 							<img src={network.icon} alt={network.name} class="w-8 h-8 rounded-full" />
 							<span class="text-sm font-medium">{network.name}</span>
@@ -280,7 +296,7 @@
 							network.id
 								? 'bg-purple-900/40 border-purple-500/50'
 								: 'hover:bg-purple-900/30'} transition-colors"
-							on:click={() => destinationNetwork$.set(network.id)}
+							on:click={() => handleDestinationNetworkChange(network.id)}
 						>
 							<img src={network.icon} alt={network.name} class="w-8 h-8 rounded-full" />
 							<span class="text-sm font-medium">{network.name}</span>
