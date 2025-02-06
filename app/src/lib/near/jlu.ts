@@ -1,11 +1,11 @@
 import { writable } from 'svelte/store';
 
 import { Ft } from './fungibleToken';
-import { wallet } from './wallet';
+import { nearWallet } from './wallet';
 
 import { FixedNumber } from '$lib/util';
 
-const { account$ } = wallet;
+const { account$ } = nearWallet;
 
 // Store for JLU balance
 export const jluBalance$ = writable<FixedNumber | null>(null);

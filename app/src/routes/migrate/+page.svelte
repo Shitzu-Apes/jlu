@@ -3,12 +3,12 @@
 
 	import { showWalletSelector } from '$lib/auth';
 	import Button from '$lib/components/Button.svelte';
-	import { wallet } from '$lib/near';
+	import { nearWallet } from '$lib/near';
 	import { Ft } from '$lib/near/fungibleToken';
 	import { updateJluBalance } from '$lib/near/jlu';
 	import { FixedNumber } from '$lib/util';
 
-	const { account$, isLoading$ } = wallet;
+	const { account$, isLoading$ } = nearWallet;
 
 	// Store for old JLU balance
 	const oldBalance$ = writable<FixedNumber | null>(null);
@@ -105,8 +105,13 @@
 		{:else}
 			<div class="bg-purple-900/20 rounded-xl p-6 text-center">
 				<p class="text-lg mb-4">Connect your NEAR wallet to start the migration process</p>
-				<Button onClick={showWalletSelector} loading={$isLoading$} class="w-full"
-					>Connect Wallet</Button
+				<Button
+					onClick={(e) => {
+						e.preventDefault();
+						showWalletSelector('near');
+					}}
+					loading={$isLoading$}
+					class="w-full">Connect Wallet</Button
 				>
 			</div>
 		{/if}

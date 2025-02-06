@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { ChainKind, getClient, omniAddress, OmniBridgeAPI } from 'omni-bridge-sdk';
-	import { writable } from 'svelte/store';
+	import { writable, get } from 'svelte/store';
 	import { match } from 'ts-pattern';
 
 	import { showWalletSelector } from '$lib/auth';
 	import Button from '$lib/components/Button.svelte';
 	import TokenInput from '$lib/components/TokenInput.svelte';
-	import { wallet } from '$lib/near';
+	import { nearWallet } from '$lib/near';
 	import { jluBalance$ } from '$lib/near/jlu';
+	import { solanaWallet } from '$lib/solana/wallet';
 
-	const { accountId$, isLoading$, selector$ } = wallet;
+	const { accountId$, isLoading$, selector$ } = nearWallet;
+	const { publicKey$ } = solanaWallet;
 
 	type Network = 'near' | 'solana' | 'base';
 
@@ -51,11 +53,52 @@
 		}
 	}
 
+	function handleFillRecipient() {
+		match($destinationNetwork$)
+			.with('solana', () => {
+				if ($publicKey$) {
+					$recipientAddress$ = $publicKey$.toBase58();
+				} else {
+					showWalletSelector('solana');
+				}
+			})
+			.with('base', () => {
+				// TODO: Add Base wallet integration
+				showWalletSelector();
+			})
+			.with('near', () => {
+				if ($accountId$) {
+					$recipientAddress$ = $accountId$;
+				} else {
+					showWalletSelector('near');
+				}
+			})
+			.exhaustive();
+	}
+
+	function getWalletButtonText(network: Network): string {
+		return match(network)
+			.with('solana', () => ($publicKey$ ? 'Use Wallet' : 'Connect Wallet'))
+			.with('base', () => 'Connect Wallet')
+			.with('near', () => ($accountId$ ? 'Use Wallet' : 'Connect Wallet'))
+			.exhaustive();
+	}
+
 	async function handleBridge() {
-		if (!$accountId$ || !$amount$) {
-			showWalletSelector();
+		if (!$amount$) {
 			return;
 		}
+
+		if ($sourceNetwork$ === 'near' && !$accountId$) {
+			showWalletSelector('near');
+			return;
+		}
+
+		if ($sourceNetwork$ === 'solana' && !$publicKey$) {
+			showWalletSelector('solana');
+			return;
+		}
+
 		const amount = $amount$.toU128();
 
 		await match($sourceNetwork$)
@@ -65,14 +108,7 @@
 				const client = getClient(ChainKind.Near, selector);
 				const api = new OmniBridgeAPI(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet');
 
-				const sender = omniAddress(
-					match($sourceNetwork$)
-						.with('near', () => ChainKind.Near)
-						.with('solana', () => ChainKind.Sol)
-						.with('base', () => ChainKind.Base)
-						.exhaustive(),
-					$accountId$
-				);
+				const sender = omniAddress(ChainKind.Near, $accountId$ ?? '');
 				const recipient = omniAddress(
 					match($destinationNetwork$)
 						.with('near', () => ChainKind.Near)
@@ -93,12 +129,40 @@
 					tokenAddress
 				});
 			})
-			.with('solana', () => {
-				// TODO
-				// const client = getClient(ChainKind.Sol, $accountId$);
+			.with('solana', async () => {
+				const wallet = get(solanaWallet.selectedWallet$);
+				if (!wallet) return;
+				const publicKey = $publicKey$?.toBase58();
+				if (!publicKey) return;
+
+				// FIXME
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const client = getClient(ChainKind.Sol, wallet as any);
+				const api = new OmniBridgeAPI(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet');
+
+				const sender = omniAddress(ChainKind.Sol, publicKey);
+				const recipient = omniAddress(
+					match($destinationNetwork$)
+						.with('near', () => ChainKind.Near)
+						.with('solana', () => ChainKind.Sol)
+						.with('base', () => ChainKind.Base)
+						.exhaustive(),
+					$recipientAddress$
+				);
+				const tokenAddress = omniAddress(ChainKind.Sol, import.meta.env.VITE_JLU_TOKEN_ID);
+
+				const fee = await api.getFee(sender, recipient, tokenAddress);
+				console.log('fee', fee);
+				client.initTransfer({
+					amount: BigInt(amount),
+					fee: BigInt(fee.transferred_token_fee ?? 0),
+					nativeFee: BigInt(fee.native_token_fee),
+					recipient,
+					tokenAddress
+				});
 			})
 			.with('base', () => {
-				// const client = getClient(ChainKind.Base, $accountId$);
+				// TODO: Add Base chain support
 			})
 			.exhaustive();
 	}
@@ -115,12 +179,15 @@
 
 	$: canBridge =
 		$amount$ &&
-		$accountId$ &&
-		$sourceNetwork$ === 'near' &&
+		(($sourceNetwork$ === 'near' && $accountId$) ||
+			($sourceNetwork$ === 'solana' && $publicKey$)) &&
 		!$isLoading$ &&
 		$sourceNetwork$ !== $destinationNetwork$ &&
 		(!$jluBalance$ || ($amount$ && $amount$.valueOf() <= $jluBalance$.valueOf())) &&
 		isValidAddress($recipientAddress$, $destinationNetwork$);
+
+	$: needsWalletConnection =
+		($sourceNetwork$ === 'near' && !$accountId$) || ($sourceNetwork$ === 'solana' && !$publicKey$);
 </script>
 
 <main class="w-full max-w-2xl mx-auto py-8 px-4">
@@ -220,37 +287,48 @@
 			<!-- Recipient Address -->
 			<div class="space-y-2">
 				<div class="text-sm text-purple-200/70">Recipient Address</div>
-				<input
-					type="text"
-					bind:value={$recipientAddress$}
-					class="w-full bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-					placeholder="{networks.find((n) => n.id === $destinationNetwork$)?.name} address"
-				/>
+				<div class="relative">
+					<input
+						type="text"
+						bind:value={$recipientAddress$}
+						class="w-full bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl pl-4 pr-[120px] py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+						placeholder="{networks.find((n) => n.id === $destinationNetwork$)?.name} address"
+					/>
+					<button
+						on:click={handleFillRecipient}
+						class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-purple-200/70 hover:text-purple-100 hover:bg-purple-900/30 px-2 py-0.5 rounded transition-colors z-10"
+					>
+						{getWalletButtonText($destinationNetwork$)}
+					</button>
+				</div>
 			</div>
 
-			<Button onClick={handleBridge} loading={$isLoading$} disabled={!canBridge} class="w-full">
-				{#if $accountId$}
-					{#if !$amount$}
-						Enter Amount
-					{:else if $sourceNetwork$ !== 'near'}
-						Only NEAR Network Supported
-					{:else}
-						Bridge {$amount$.format({
-							compactDisplay: 'short',
-							notation: 'compact',
-							maximumFractionDigits: 4,
-							maximumSignificantDigits: 8
-						})} JLU
-					{/if}
-				{:else}
+			<Button
+				onClick={handleBridge}
+				loading={$isLoading$}
+				disabled={!needsWalletConnection && !canBridge}
+				class="w-full"
+			>
+				{#if needsWalletConnection}
 					Connect Wallet
+				{:else if !$amount$}
+					Enter Amount
+				{:else if $sourceNetwork$ === 'base'}
+					Bridging from Base not yet supported
+				{:else}
+					Bridge {$amount$.format({
+						compactDisplay: 'short',
+						notation: 'compact',
+						maximumFractionDigits: 4,
+						maximumSignificantDigits: 8
+					})} JLU
 				{/if}
 			</Button>
 
 			<div class="text-sm text-purple-200/70">
 				<p>Note:</p>
 				<ul class="list-disc list-inside mt-2 space-y-1">
-					<li>Currently only bridging from NEAR network is supported</li>
+					<li>Currently bridging from NEAR and Solana networks is supported</li>
 					<li>Bridge fees may apply depending on the source and destination network</li>
 					<li>Bridging time should be less than 1 minute</li>
 				</ul>

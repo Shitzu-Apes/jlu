@@ -22,8 +22,8 @@ export type Auth = {
 	};
 };
 
-export async function showWalletSelector() {
-	openBottomSheet(WalletSelector);
+export async function showWalletSelector(initialNetwork?: 'near' | 'solana') {
+	openBottomSheet(WalletSelector, { initialNetwork });
 }
 
 export const session$ = writable<Promise<Auth | undefined>>(new Promise<never>(() => undefined));
