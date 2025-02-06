@@ -4,8 +4,8 @@
 	import { clickOutside } from '$lib/actions';
 	import { showWalletSelector } from '$lib/auth';
 	import { nearWallet } from '$lib/near';
-	import { jluBalance$ } from '$lib/near/jlu';
 	import { solanaWallet } from '$lib/solana/wallet';
+	import { jluBalance$ } from '$lib/stores/jlu';
 
 	const { accountId$, iconUrl$, walletName$, isLoading$ } = nearWallet;
 	const { publicKey$, selectedWallet$, connected$ } = solanaWallet;
@@ -67,11 +67,11 @@
 								<div class="flex-1 min-w-0">
 									<div class="text-sm font-medium text-purple-100">{walletName}</div>
 									<div class="text-sm text-purple-200/70 truncate">{accountId}</div>
-									{#if $jluBalance$}
-										<div class="flex items-center gap-2 text-sm text-purple-200/70 mt-1 md:hidden">
+									{#if $jluBalance$.near}
+										<div class="flex items-center gap-2 text-sm text-purple-200/70 mt-1">
 											<img src="/logo.webp" alt="JLU" class="w-4 h-4 rounded-full" />
 											<span class="font-medium text-purple-100"
-												>{$jluBalance$.format({
+												>{$jluBalance$.near.format({
 													compactDisplay: 'short',
 													notation: 'compact',
 													maximumFractionDigits: 2
@@ -124,6 +124,19 @@
 								<div class="text-sm text-purple-200/70 truncate">
 									{$publicKey$?.toBase58().slice(0, 4)}...{$publicKey$?.toBase58().slice(-4)}
 								</div>
+								{#if $jluBalance$.solana}
+									<div class="flex items-center gap-2 text-sm text-purple-200/70 mt-1">
+										<img src="/logo.webp" alt="JLU" class="w-4 h-4 rounded-full" />
+										<span class="font-medium text-purple-100"
+											>{$jluBalance$.solana.format({
+												compactDisplay: 'short',
+												notation: 'compact',
+												maximumFractionDigits: 2
+											})}</span
+										>
+										<span>JLU</span>
+									</div>
+								{/if}
 							</div>
 						</div>
 						<Button

@@ -5,7 +5,7 @@
 	import Button from '$lib/components/Button.svelte';
 	import { nearWallet } from '$lib/near';
 	import { Ft } from '$lib/near/fungibleToken';
-	import { updateJluBalance } from '$lib/near/jlu';
+	import { updateJluBalance } from '$lib/stores';
 	import { FixedNumber } from '$lib/util';
 
 	const { account$, isLoading$ } = nearWallet;

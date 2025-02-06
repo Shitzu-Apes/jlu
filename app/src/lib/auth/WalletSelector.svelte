@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Adapter } from '@solana/wallet-adapter-base';
+	import type { SignerWalletAdapter } from '@solana/wallet-adapter-base';
 
 	import { Content } from '$lib/layout/BottomSheet';
 	import { closeBottomSheet, openBottomSheet } from '$lib/layout/BottomSheet/Container.svelte';
@@ -28,7 +28,7 @@
 		closeBottomSheet();
 	}
 
-	async function handleSolanaWalletClick(wallet: Adapter) {
+	async function handleSolanaWalletClick(wallet: SignerWalletAdapter) {
 		try {
 			await solanaWallet.connect(wallet);
 			closeBottomSheet();

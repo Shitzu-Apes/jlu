@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import UserMenu from '$lib/components/UserMenu.svelte';
-	import { jluBalance$ } from '$lib/near/jlu';
+	import { activeBalance$ } from '$lib/stores';
 </script>
 
 <header
@@ -38,11 +38,11 @@
 		</nav>
 	</div>
 	<div class="flex items-center gap-2 sm:gap-4">
-		{#if $jluBalance$}
+		{#if $activeBalance$}
 			<div class="hidden md:flex items-center gap-2 text-sm text-purple-200/70">
 				<img src="/logo.webp" alt="JLU" class="w-5 h-5 rounded-full" />
 				<span class="font-medium text-purple-100"
-					>{$jluBalance$.format({
+					>{$activeBalance$.format({
 						compactDisplay: 'short',
 						notation: 'compact',
 						maximumFractionDigits: 2

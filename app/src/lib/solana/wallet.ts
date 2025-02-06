@@ -1,9 +1,5 @@
-import type { Adapter } from '@solana/wallet-adapter-base';
-import {
-	PhantomWalletAdapter,
-	SolflareWalletAdapter,
-	TorusWalletAdapter
-} from '@solana/wallet-adapter-wallets';
+import type { SignerWalletAdapter } from '@solana/wallet-adapter-base';
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, Connection, type PublicKey } from '@solana/web3.js';
 import { derived, get, writable } from 'svelte/store';
 
@@ -14,17 +10,13 @@ const endpoint = clusterApiUrl(network);
 const connection = new Connection(endpoint);
 
 class SolanaWallet {
-	private _wallets$ = writable<Adapter[]>([]);
-	private _selectedWallet$ = writable<Adapter | undefined>();
+	private _wallets$ = writable<SignerWalletAdapter[]>([]);
+	private _selectedWallet$ = writable<SignerWalletAdapter | undefined>();
 	private _publicKey$ = writable<PublicKey | undefined>();
 	private _isAutoConnecting$ = writable(false);
 
 	constructor() {
-		const wallets = [
-			new PhantomWalletAdapter(),
-			new SolflareWalletAdapter(),
-			new TorusWalletAdapter()
-		];
+		const wallets = [new PhantomWalletAdapter(), new SolflareWalletAdapter()];
 		this._wallets$.set(wallets);
 
 		// Try to auto-connect on initialization
@@ -76,7 +68,7 @@ class SolanaWallet {
 		}
 	}
 
-	public async connect(wallet: Adapter) {
+	public async connect(wallet: SignerWalletAdapter) {
 		try {
 			await wallet.connect();
 			this._selectedWallet$.set(wallet);
@@ -143,6 +135,16 @@ class SolanaWallet {
 
 	public getConnection() {
 		return connection;
+	}
+
+	public getAnchorWallet() {
+		const wallet = get(this._selectedWallet$);
+		if (!wallet) throw new Error('No wallet selected');
+		return {
+			signTransaction: wallet.signTransaction,
+			signAllTransactions: wallet.signAllTransactions,
+			publicKey: wallet.publicKey as PublicKey
+		};
 	}
 }
 

@@ -1,14 +1,17 @@
 <script lang="ts">
-	import { ChainKind, getClient, omniAddress, OmniBridgeAPI } from 'omni-bridge-sdk';
+	import { AnchorProvider } from '@coral-xyz/anchor';
+	import { ChainKind, getClient, omniAddress, OmniBridgeAPI, type Chain } from 'omni-bridge-sdk';
 	import { writable, get } from 'svelte/store';
 	import { match } from 'ts-pattern';
 
 	import { showWalletSelector } from '$lib/auth';
 	import Button from '$lib/components/Button.svelte';
 	import TokenInput from '$lib/components/TokenInput.svelte';
+	import TransferStatus from '$lib/components/TransferStatus.svelte';
 	import { nearWallet } from '$lib/near';
-	import { jluBalance$ } from '$lib/near/jlu';
 	import { solanaWallet } from '$lib/solana/wallet';
+	import { jluBalance$ } from '$lib/stores/jlu';
+	import { transfers } from '$lib/stores/transfers';
 
 	const { accountId$, isLoading$, selector$ } = nearWallet;
 	const { publicKey$ } = solanaWallet;
@@ -48,8 +51,9 @@
 	}
 
 	function handleMaxAmount() {
-		if ($jluBalance$) {
-			$amountValue$ = $jluBalance$.toString();
+		const currentBalance = $sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana;
+		if (currentBalance) {
+			$amountValue$ = currentBalance.toString();
 		}
 	}
 
@@ -100,13 +104,13 @@
 		}
 
 		const amount = $amount$.toU128();
+		const api = new OmniBridgeAPI(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet');
 
-		await match($sourceNetwork$)
+		const transferEvent = await match($sourceNetwork$)
 			.with('near', async () => {
 				const selector = await $selector$;
 
 				const client = getClient(ChainKind.Near, selector);
-				const api = new OmniBridgeAPI(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet');
 
 				const sender = omniAddress(ChainKind.Near, $accountId$ ?? '');
 				const recipient = omniAddress(
@@ -120,8 +124,7 @@
 				const tokenAddress = omniAddress(ChainKind.Near, import.meta.env.VITE_JLU_TOKEN_ID);
 
 				const fee = await api.getFee(sender, recipient, tokenAddress);
-				console.log('fee', fee);
-				client.initTransfer({
+				return client.initTransfer({
 					amount: BigInt(amount),
 					fee: BigInt(fee.transferred_token_fee ?? 0),
 					nativeFee: BigInt(fee.native_token_fee),
@@ -135,10 +138,12 @@
 				const publicKey = $publicKey$?.toBase58();
 				if (!publicKey) return;
 
-				// FIXME
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const client = getClient(ChainKind.Sol, wallet as any);
-				const api = new OmniBridgeAPI(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet');
+				const provider = new AnchorProvider(
+					solanaWallet.getConnection(),
+					solanaWallet.getAnchorWallet()
+				);
+
+				const client = getClient(ChainKind.Sol, provider);
 
 				const sender = omniAddress(ChainKind.Sol, publicKey);
 				const recipient = omniAddress(
@@ -149,11 +154,10 @@
 						.exhaustive(),
 					$recipientAddress$
 				);
-				const tokenAddress = omniAddress(ChainKind.Sol, import.meta.env.VITE_JLU_TOKEN_ID);
+				const tokenAddress = omniAddress(ChainKind.Sol, import.meta.env.VITE_JLU_TOKEN_ID_SOLANA);
 
 				const fee = await api.getFee(sender, recipient, tokenAddress);
-				console.log('fee', fee);
-				client.initTransfer({
+				return client.initTransfer({
 					amount: BigInt(amount),
 					fee: BigInt(fee.transferred_token_fee ?? 0),
 					nativeFee: BigInt(fee.native_token_fee),
@@ -163,9 +167,33 @@
 			})
 			.with('base', () => {
 				// TODO: Add Base chain support
+				throw new Error();
 			})
 			.exhaustive();
+
+		console.log('[transferEvent]', transferEvent);
+		if (!transferEvent) {
+			throw new Error('Failed to initiate transfer');
+		}
+		if (typeof transferEvent === 'string') {
+			throw new Error('Failed to initiate transfer');
+		}
+
+		const chain: Chain = match($sourceNetwork$)
+			.with('near', () => 'Near' as const)
+			.with('solana', () => 'Sol' as const)
+			.with('base', () => 'Base' as const)
+			.exhaustive();
+
+		// Show the transfer status component
+		const transfer = transfers.getTransfer(chain, transferEvent.transfer_message.origin_nonce);
+		if (!transfer) {
+			showTransferStatus = true;
+		}
 	}
+
+	let showTransferStatus = false;
+	$: latestTransfer = $transfers[0];
 
 	function isValidAddress(address: string, network: Network): boolean {
 		if (!address) return false;
@@ -177,34 +205,48 @@
 			.exhaustive();
 	}
 
+	$: walletConnected = match($sourceNetwork$)
+		.with('near', () => Boolean($accountId$))
+		.with('solana', () => Boolean($publicKey$))
+		.with('base', () => false)
+		.exhaustive();
+
+	$: currentBalance = match($sourceNetwork$)
+		.with('near', () => $jluBalance$.near?.valueOf() ?? 0n)
+		.with('solana', () => ($jluBalance$.solana?.valueOf() ?? 0n) * 1000000000n)
+		.with('base', () => 0n)
+		.exhaustive();
+
 	$: canBridge =
-		$amount$ &&
-		(($sourceNetwork$ === 'near' && $accountId$) ||
-			($sourceNetwork$ === 'solana' && $publicKey$)) &&
+		Boolean($amount$) &&
+		walletConnected &&
 		!$isLoading$ &&
 		$sourceNetwork$ !== $destinationNetwork$ &&
-		(!$jluBalance$ || ($amount$ && $amount$.valueOf() <= $jluBalance$.valueOf())) &&
+		(!$jluBalance$ || ($amount$ && $amount$.valueOf() <= currentBalance)) &&
 		isValidAddress($recipientAddress$, $destinationNetwork$);
 
-	$: needsWalletConnection =
-		($sourceNetwork$ === 'near' && !$accountId$) || ($sourceNetwork$ === 'solana' && !$publicKey$);
+	$: needsWalletConnection = match($sourceNetwork$)
+		.with('near', () => !$accountId$)
+		.with('solana', () => !$publicKey$)
+		.with('base', () => true)
+		.exhaustive();
 </script>
 
-<main class="w-full max-w-2xl mx-auto py-8 px-4">
-	<div class="space-y-8">
-		<div class="text-center space-y-4">
+<main class="w-full max-w-2xl mx-auto py-6 px-4">
+	<div class="flex flex-col gap-6">
+		<div class="flex flex-col items-center gap-3">
 			<h1 class="text-4xl font-bold text-purple-100">Bridge JLU</h1>
 			<p class="text-lg text-purple-200/70">Transfer your JLU tokens between networks</p>
 		</div>
 
-		<div class="bg-purple-900/20 rounded-xl p-6 space-y-6">
+		<div class="flex flex-col gap-5 bg-purple-900/20 rounded-xl p-5">
 			<!-- Source Network -->
-			<div class="space-y-2">
+			<div class="flex flex-col gap-1.5">
 				<div class="text-sm text-purple-200/70">From</div>
 				<div class="grid grid-cols-3 gap-2">
 					{#each networks as network}
 						<button
-							class="flex flex-col items-center gap-2 p-3 rounded-xl border border-purple-900/20 {$sourceNetwork$ ===
+							class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-purple-900/20 {$sourceNetwork$ ===
 							network.id
 								? 'bg-purple-900/40 border-purple-500/50'
 								: 'hover:bg-purple-900/30'} transition-colors"
@@ -229,12 +271,12 @@
 			</div>
 
 			<!-- Destination Network -->
-			<div class="space-y-2">
+			<div class="flex flex-col gap-1.5">
 				<div class="text-sm text-purple-200/70">To</div>
 				<div class="grid grid-cols-3 gap-2">
 					{#each networks as network}
 						<button
-							class="flex flex-col items-center gap-2 p-3 rounded-xl border border-purple-900/20 {$destinationNetwork$ ===
+							class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-purple-900/20 {$destinationNetwork$ ===
 							network.id
 								? 'bg-purple-900/40 border-purple-500/50'
 								: 'hover:bg-purple-900/30'} transition-colors"
@@ -248,14 +290,16 @@
 			</div>
 
 			<!-- Amount -->
-			<div class="space-y-2">
+			<div class="flex flex-col gap-1.5">
 				<div class="flex items-center justify-between">
 					<div class="text-sm text-purple-200/70">Amount</div>
-					{#if $jluBalance$}
+					{#if $sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana}
 						<div class="flex items-center gap-2 text-purple-200/70">
 							<img src="/logo.webp" alt="JLU" class="w-4 h-4 rounded-full" />
 							<span class="text-sm font-medium text-purple-100"
-								>{$jluBalance$.format({ maximumSignificantDigits: 8 })}</span
+								>{($sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana)?.format({
+									maximumSignificantDigits: 8
+								})}</span
 							>
 							<span class="text-sm">Available</span>
 						</div>
@@ -273,7 +317,7 @@
 						class="w-full bg-zinc-900/50 text-white border border-purple-900/20 rounded-xl pl-20 pr-16 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
 						placeholder="0.0"
 					/>
-					{#if $jluBalance$}
+					{#if $sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana}
 						<button
 							on:click={handleMaxAmount}
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-purple-200/70 hover:text-purple-100 hover:bg-purple-900/30 px-2 py-0.5 rounded transition-colors z-10"
@@ -285,7 +329,7 @@
 			</div>
 
 			<!-- Recipient Address -->
-			<div class="space-y-2">
+			<div class="flex flex-col gap-1.5">
 				<div class="text-sm text-purple-200/70">Recipient Address</div>
 				<div class="relative">
 					<input
@@ -325,9 +369,44 @@
 				{/if}
 			</Button>
 
-			<div class="text-sm text-purple-200/70">
+			{#if showTransferStatus && latestTransfer}
+				<div class="p-4 bg-purple-900/30 rounded-xl">
+					<TransferStatus
+						chain={latestTransfer.chain}
+						nonce={latestTransfer.nonce}
+						amount={latestTransfer.amount}
+					/>
+				</div>
+			{/if}
+
+			{#if $transfers.length > 0}
+				<div class="flex flex-col gap-2">
+					<div class="text-sm text-purple-200/70">Recent Transfers</div>
+					<div class="flex flex-col gap-1.5">
+						{#each $transfers as transfer}
+							<div class="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg">
+								<div class="flex flex-col gap-1">
+									<div class="text-sm font-medium">
+										{transfer.amount} JLU
+									</div>
+									<div class="text-xs text-purple-200/70">
+										{new Date(transfer.timestamp).toLocaleString()}
+									</div>
+								</div>
+								<TransferStatus
+									chain={transfer.chain}
+									nonce={transfer.nonce}
+									amount={transfer.amount}
+								/>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<div class="flex flex-col gap-1.5 text-sm text-purple-200/70">
 				<p>Note:</p>
-				<ul class="list-disc list-inside mt-2 space-y-1">
+				<ul class="list-disc list-inside flex flex-col gap-1">
 					<li>Currently bridging from NEAR and Solana networks is supported</li>
 					<li>Bridge fees may apply depending on the source and destination network</li>
 					<li>Bridging time should be less than 1 minute</li>
