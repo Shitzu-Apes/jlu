@@ -173,8 +173,9 @@
 				const tokenAddress = omniAddress(ChainKind.Sol, import.meta.env.VITE_JLU_TOKEN_ID_SOLANA);
 
 				const fee = await api.getFee(sender, recipient, tokenAddress);
+				console.log(amount)
 				return client.initTransfer({
-					amount: BigInt(amount),
+					amount: BigInt(amount)/BigInt(1000000000n),
 					fee: BigInt(fee.transferred_token_fee ?? 0),
 					nativeFee: BigInt(fee.native_token_fee),
 					recipient,
@@ -189,9 +190,6 @@
 
 		console.log('[transferEvent]', transferEvent);
 		if (!transferEvent) {
-			throw new Error('Failed to initiate transfer');
-		}
-		if (typeof transferEvent === 'string') {
 			throw new Error('Failed to initiate transfer');
 		}
 
