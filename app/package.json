@@ -28,12 +28,14 @@
 		"@solana/wallet-adapter-wallets": "^0.19.32",
 		"@solana/web3.js": "^1.98.0",
 		"@unocss/reset": "^0.64.1",
+		"@wagmi/connectors": "^5.7.6",
 		"@wagmi/core": "^2.16.3",
 		"@web3modal/wagmi": "^5.1.11",
 		"dayjs": "^1.11.13",
+		"ethers": "^6.13.5",
 		"omni-bridge-sdk": "^0.6.1",
 		"ts-pattern": "^5.5.0",
-		"wagmi": "^2.14.9"
+		"viem": "^2.22.23"
 	},
 	"devDependencies": {
 		"@iconify-json/mdi": "^1.2.1",

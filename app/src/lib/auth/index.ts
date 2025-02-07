@@ -22,7 +22,7 @@ export type Auth = {
 	};
 };
 
-export async function showWalletSelector(initialNetwork?: 'near' | 'solana') {
+export async function showWalletSelector(initialNetwork?: 'near' | 'solana' | 'base') {
 	openBottomSheet(WalletSelector, { initialNetwork });
 }
 

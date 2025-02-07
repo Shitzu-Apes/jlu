@@ -1,12 +1,17 @@
 <script lang="ts">
+	import { getConnectorClient, type Config } from '@wagmi/core';
+	import { base, baseSepolia } from '@wagmi/core/chains';
+	import { BrowserProvider, JsonRpcSigner } from 'ethers';
 	import { ChainKind, getClient, omniAddress, OmniBridgeAPI, type Chain } from 'omni-bridge-sdk';
 	import { writable, get } from 'svelte/store';
 	import { match } from 'ts-pattern';
 
 	import { showWalletSelector } from '$lib/auth';
 	import Button from '$lib/components/Button.svelte';
+	import { showToast } from '$lib/components/Toast.svelte';
 	import TokenInput from '$lib/components/TokenInput.svelte';
 	import TransferStatus from '$lib/components/TransferStatus.svelte';
+	import { evmWallet$, config, switchToBase } from '$lib/evm/wallet';
 	import { nearWallet } from '$lib/near';
 	import { solanaWallet } from '$lib/solana/wallet';
 	import { jluBalance$, updateJluBalance } from '$lib/stores/jlu';
@@ -93,10 +98,17 @@
 			sourceNetwork$.set($destinationNetwork$);
 		}
 		destinationNetwork$.set(network);
+		// Reset recipient address when destination changes
+		recipientAddress$.set('');
 	}
 
 	function handleMaxAmount() {
-		const currentBalance = $sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana;
+		const currentBalance = match($sourceNetwork$)
+			.with('near', () => $jluBalance$.near)
+			.with('solana', () => $jluBalance$.solana)
+			.with('base', () => $jluBalance$.base)
+			.exhaustive();
+
 		if (currentBalance) {
 			$amountValue$ = currentBalance.toString();
 		}
@@ -112,8 +124,11 @@
 				}
 			})
 			.with('base', () => {
-				// TODO: Add Base wallet integration
-				showWalletSelector();
+				if ($evmWallet$.status === 'connected') {
+					$recipientAddress$ = $evmWallet$.address;
+				} else {
+					showWalletSelector('base');
+				}
 			})
 			.with('near', () => {
 				if ($accountId$) {
@@ -128,23 +143,31 @@
 	function getWalletButtonText(network: Network): string {
 		return match(network)
 			.with('solana', () => ($publicKey$ ? 'Use Wallet' : 'Connect Wallet'))
-			.with('base', () => 'Connect Wallet')
+			.with('base', () => ($evmWallet$.status === 'connected' ? 'Use Wallet' : 'Connect Wallet'))
 			.with('near', () => ($accountId$ ? 'Use Wallet' : 'Connect Wallet'))
 			.exhaustive();
 	}
 
+	async function getEthersSigner(config: Config) {
+		const evmWallet = $evmWallet$;
+		const client = await getConnectorClient(config, {
+			chainId: evmWallet.chainId,
+			connector: evmWallet.connector,
+			account: evmWallet.address
+		});
+		const chain = import.meta.env.VITE_NETWORK_ID === 'mainnet' ? base : baseSepolia;
+		const network = {
+			chainId: chain.id,
+			name: chain.name,
+			ensAddress: client.chain?.contracts?.ensRegistry?.address
+		};
+		const provider = new BrowserProvider(client.transport, network);
+		const signer = new JsonRpcSigner(provider, client.account.address);
+		return signer;
+	}
+
 	async function handleBridge() {
 		if (!$amount$) {
-			return;
-		}
-
-		if ($sourceNetwork$ === 'near' && !$accountId$) {
-			showWalletSelector('near');
-			return;
-		}
-
-		if ($sourceNetwork$ === 'solana' && !$publicKey$) {
-			showWalletSelector('solana');
 			return;
 		}
 
@@ -210,9 +233,54 @@
 					tokenAddress
 				});
 			})
-			.with('base', () => {
-				// TODO: Add Base chain support
-				throw new Error();
+			.with('base', async () => {
+				if ($evmWallet$.status !== 'connected') return;
+
+				// Check if we're on the correct network
+				const targetChainId =
+					import.meta.env.VITE_NETWORK_ID === 'mainnet' ? base.id : baseSepolia.id;
+				if ($evmWallet$.chainId !== targetChainId) {
+					try {
+						await switchToBase();
+					} catch (error) {
+						console.error('Failed to switch network:', error);
+						showToast({
+							data: {
+								type: 'simple',
+								data: {
+									title: 'Network Switch Failed',
+									description: 'Please switch to Base network to continue.',
+									type: 'error'
+								}
+							}
+						});
+						return;
+					}
+				}
+
+				// Get ethers signer
+				const signer = await getEthersSigner(config);
+				const client = getClient(ChainKind.Base, signer);
+
+				const sender = omniAddress(ChainKind.Base, $evmWallet$.address);
+				const recipient = omniAddress(
+					match($destinationNetwork$)
+						.with('near', () => ChainKind.Near)
+						.with('solana', () => ChainKind.Sol)
+						.with('base', () => ChainKind.Base)
+						.exhaustive(),
+					$recipientAddress$
+				);
+				const tokenAddress = omniAddress(ChainKind.Base, import.meta.env.VITE_JLU_TOKEN_ID_BASE);
+
+				const fee = await api.getFee(sender, recipient, tokenAddress);
+				return client.initTransfer({
+					amount: BigInt(amount),
+					fee: BigInt(fee.transferred_token_fee ?? 0),
+					nativeFee: BigInt(fee.native_token_fee),
+					recipient,
+					tokenAddress
+				});
 			})
 			.exhaustive();
 
@@ -246,6 +314,7 @@
 			if (data.length === 0) {
 				throw new Error('Failed to fetch transfer data after multiple retries');
 			}
+			console.log('[data]', data);
 
 			transfers.addTransfer({
 				chain,
@@ -257,6 +326,7 @@
 				recipient: data[0].transfer_message.recipient
 			});
 		} else {
+			console.log('[rawTransferEvent]', rawTransferEvent);
 			transfers.addTransfer({
 				chain,
 				nonce: rawTransferEvent.transfer_message.origin_nonce,
@@ -287,13 +357,13 @@
 	$: walletConnected = match($sourceNetwork$)
 		.with('near', () => Boolean($accountId$))
 		.with('solana', () => Boolean($publicKey$))
-		.with('base', () => false)
+		.with('base', () => $evmWallet$.status === 'connected')
 		.exhaustive();
 
 	$: currentBalance = match($sourceNetwork$)
 		.with('near', () => $jluBalance$.near?.valueOf() ?? 0n)
 		.with('solana', () => ($jluBalance$.solana?.valueOf() ?? 0n) * 1000000000n)
-		.with('base', () => 0n)
+		.with('base', () => $jluBalance$.base?.valueOf() ?? 0n)
 		.exhaustive();
 
 	$: canBridge =
@@ -307,7 +377,7 @@
 	$: needsWalletConnection = match($sourceNetwork$)
 		.with('near', () => !$accountId$)
 		.with('solana', () => !$publicKey$)
-		.with('base', () => true)
+		.with('base', () => $evmWallet$.status !== 'connected')
 		.exhaustive();
 </script>
 
@@ -372,14 +442,23 @@
 			<div class="flex flex-col gap-1.5">
 				<div class="flex items-center justify-between">
 					<div class="text-sm text-purple-200/70">Amount</div>
-					{#if $sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana}
+					{#if match($sourceNetwork$)
+						.with('near', () => $jluBalance$.near)
+						.with('solana', () => $jluBalance$.solana)
+						.with('base', () => $jluBalance$.base)
+						.exhaustive()}
 						<div class="flex items-center gap-2 text-purple-200/70">
 							<img src="/logo.webp" alt="JLU" class="w-4 h-4 rounded-full" />
 							<span class="text-sm font-medium text-purple-100"
-								>{($sourceNetwork$ === 'near' ? $jluBalance$.near : $jluBalance$.solana)?.format({
-									maximumSignificantDigits: 8
-								})}</span
-							>
+								>{match($sourceNetwork$)
+									.with('near', () => $jluBalance$.near)
+									.with('solana', () => $jluBalance$.solana)
+									.with('base', () => $jluBalance$.base)
+									.exhaustive()
+									?.format({
+										maximumSignificantDigits: 8
+									})}
+							</span>
 							<span class="text-sm">Available</span>
 						</div>
 					{/if}
@@ -436,8 +515,6 @@
 					Connect Wallet
 				{:else if !$amount$}
 					Enter Amount
-				{:else if $sourceNetwork$ === 'base'}
-					Bridging from Base not yet supported
 				{:else}
 					Bridge {$amount$.format({
 						compactDisplay: 'short',

@@ -3,6 +3,7 @@
 
 	import { clickOutside } from '$lib/actions';
 	import { showWalletSelector } from '$lib/auth';
+	import { evmWallet$, disconnect as disconnectBase } from '$lib/evm/wallet';
 	import { nearWallet } from '$lib/near';
 	import { solanaWallet } from '$lib/solana/wallet';
 	import { jluBalance$ } from '$lib/stores/jlu';
@@ -21,9 +22,14 @@
 		solanaWallet.disconnect();
 		isOpen = false;
 	}
+
+	function handleBaseDisconnect() {
+		disconnectBase();
+		isOpen = false;
+	}
 </script>
 
-{#if $accountId$ || $connected$}
+{#if $accountId$ || $connected$ || $evmWallet$.status === 'connected'}
 	<div class="relative" use:clickOutside={() => (isOpen = false)}>
 		<Button
 			type="secondary"
@@ -44,6 +50,13 @@
 			{:else if $connected$ && $selectedWallet$}
 				<img src={$selectedWallet$.icon} alt={$selectedWallet$.name} class="w-7 h-7 rounded-full" />
 				<div class="i-mdi:chevron-down text-lg text-purple-200/70" />
+			{:else if $evmWallet$.status === 'connected'}
+				<img
+					src={$evmWallet$.connector?.icon}
+					alt={$evmWallet$.connector?.name ?? 'EVM Wallet'}
+					class="w-7 h-7 rounded-full"
+				/>
+				<div class="i-mdi:chevron-down text-lg text-purple-200/70" />
 			{/if}
 		</Button>
 
@@ -53,7 +66,6 @@
 			>
 				<!-- NEAR Wallet Section -->
 				<div class="px-4 py-2 border-b border-purple-900/20">
-					<div class="text-sm text-purple-200/70 mb-2">NEAR Wallet</div>
 					{#if $accountId$}
 						{#await Promise.all( [$iconUrl$, $walletName$, $accountId$] ) then [iconUrl, walletName, accountId]}
 							<div class="flex items-center gap-3">
@@ -110,8 +122,7 @@
 				</div>
 
 				<!-- Solana Wallet Section -->
-				<div class="px-4 py-2">
-					<div class="text-sm text-purple-200/70 mb-2">Solana Wallet</div>
+				<div class="px-4 py-2 border-b border-purple-900/20">
 					{#if $connected$ && $selectedWallet$}
 						<div class="flex items-center gap-3">
 							<img
@@ -160,6 +171,62 @@
 							class="w-full"
 						>
 							Connect Solana Wallet
+						</Button>
+					{/if}
+				</div>
+
+				<!-- Base Wallet Section -->
+				<div class="px-4 py-2">
+					{#if $evmWallet$.status === 'connected'}
+						<div class="flex items-center gap-3">
+							<img
+								src={$evmWallet$.connector?.icon}
+								alt={$evmWallet$.connector?.name ?? 'EVM Wallet'}
+								class="w-10 h-10 rounded-full"
+							/>
+							<div class="flex-1 min-w-0">
+								<div class="text-sm font-medium text-purple-100">
+									{$evmWallet$.connector?.name ?? 'EVM Wallet'}
+								</div>
+								<div class="text-sm text-purple-200/70 truncate">
+									{$evmWallet$.address.slice(0, 4)}...{$evmWallet$.address.slice(-4)}
+								</div>
+								{#if $jluBalance$.base}
+									<div class="flex items-center gap-2 text-sm text-purple-200/70 mt-1">
+										<img src="/logo.webp" alt="JLU" class="w-4 h-4 rounded-full" />
+										<span class="font-medium text-purple-100"
+											>{$jluBalance$.base.format({
+												compactDisplay: 'short',
+												notation: 'compact',
+												maximumFractionDigits: 2
+											})}</span
+										>
+										<span>JLU</span>
+									</div>
+								{/if}
+							</div>
+						</div>
+						<Button
+							type="secondary"
+							size="s"
+							onClick={handleBaseDisconnect}
+							class="w-full !justify-start !px-4 mt-2"
+						>
+							<div class="i-mdi:logout text-xl" />
+							<span class="ml-2">Disconnect Base</span>
+						</Button>
+					{:else}
+						<Button
+							type="secondary"
+							size="s"
+							onClick={(e) => {
+								e.preventDefault();
+								isOpen = false;
+								showWalletSelector('base');
+							}}
+							class="w-full"
+						>
+							Connect Base Wallet
 						</Button>
 					{/if}
 				</div>

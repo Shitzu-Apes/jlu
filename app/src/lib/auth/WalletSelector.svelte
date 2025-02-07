@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { SignerWalletAdapter } from '@solana/wallet-adapter-base';
+	import { connect, getConnectors } from '@wagmi/core';
 
+	import { config, switchToBase } from '$lib/evm/wallet';
 	import { Content } from '$lib/layout/BottomSheet';
 	import { closeBottomSheet, openBottomSheet } from '$lib/layout/BottomSheet/Container.svelte';
 	import type { UnionModuleState } from '$lib/models';
@@ -9,11 +11,12 @@
 
 	const modules$ = nearWallet.modules$;
 	const solanaWallets$ = solanaWallet.wallets$;
+	const connectors = getConnectors(config);
 
-	export let initialNetwork: 'near' | 'solana' | undefined = undefined;
-	let selectedNetwork: 'near' | 'solana' = initialNetwork ?? 'near';
+	export let initialNetwork: 'near' | 'solana' | 'base' | undefined = undefined;
+	let selectedNetwork: 'near' | 'solana' | 'base' = initialNetwork ?? 'near';
 
-	function handleNetworkChange(network: 'near' | 'solana') {
+	function handleNetworkChange(network: 'near' | 'solana' | 'base') {
 		if (document.startViewTransition) {
 			document.startViewTransition(() => {
 				selectedNetwork = network;
@@ -34,6 +37,16 @@
 			closeBottomSheet();
 		} catch (error) {
 			console.error('Failed to connect wallet:', error);
+		}
+	}
+
+	async function handleBaseWalletClick(connector: (typeof connectors)[number]) {
+		try {
+			await connect(config, { connector });
+			await switchToBase();
+			closeBottomSheet();
+		} catch (error) {
+			console.error('Failed to connect Base wallet:', error);
 		}
 	}
 </script>
@@ -63,6 +76,16 @@
 			>
 				<img src="/sol-logo.webp" alt="Solana" class="w-5 h-5 rounded-full" />
 				Solana
+			</button>
+			<button
+				class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2 {selectedNetwork ===
+				'base'
+					? 'bg-purple-900/40 text-purple-100'
+					: 'hover:bg-purple-900/20 text-purple-200/70 hover:text-purple-100'}"
+				on:click={() => handleNetworkChange('base')}
+			>
+				<img src="/base-logo.webp" alt="Base" class="w-5 h-5 rounded-full" />
+				Base
 			</button>
 		</div>
 
@@ -129,7 +152,7 @@
 							</div>
 						{/each}
 					{/await}
-				{:else}
+				{:else if selectedNetwork === 'solana'}
 					{#each $solanaWallets$ as wallet}
 						<div class="flex gap-2 items-center">
 							<button
@@ -155,6 +178,43 @@
 							{/if}
 						</div>
 					{/each}
+				{:else}
+					<!-- Base Wallet Section -->
+					<div class="flex flex-col gap-2">
+						{#each connectors as connector (connector.id)}
+							{#if connector.id !== 'injected'}
+								<div class="flex gap-2 items-center">
+									<button
+										on:click={() => handleBaseWalletClick(connector)}
+										class="hover:bg-purple-800/50 p-2 rounded-xl flex items-center flex-1 transition-colors"
+									>
+										<img
+											src={connector.icon}
+											alt={connector.name}
+											class="w-10 h-10 object-contain mr-5"
+										/>
+										<div class="flex flex-col text-left uppercase mr-auto">
+											<span class="text-white">{connector.name}</span>
+										</div>
+									</button>
+								</div>
+							{/if}
+						{/each}
+						{#if connectors.length === 0}
+							<div class="text-center text-purple-200/70 py-2">
+								No EVM wallets detected. Install MetaMask or another EVM wallet to continue.
+							</div>
+							<a
+								href="https://metamask.io/download/"
+								target="_blank"
+								rel="noopener"
+								class="hover:bg-purple-800/50 p-2 rounded-xl flex items-center justify-center gap-2 transition-colors"
+							>
+								<div class="i-mdi:download w-6 h-6 text-white" />
+								<span>Install MetaMask</span>
+							</a>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</div>

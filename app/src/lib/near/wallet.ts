@@ -7,11 +7,11 @@ import type {
 	ModuleState,
 	Wallet as NearWallet
 } from '@near-wallet-selector/core';
+import { injected, walletConnect } from '@wagmi/connectors';
 import { createConfig, http } from '@wagmi/core';
 import type { SvelteComponent } from 'svelte';
 import { derived, get, readable, writable } from 'svelte/store';
 import { P, match } from 'ts-pattern';
-import { injected, walletConnect } from 'wagmi/connectors';
 
 import { browser } from '$app/environment';
 import { showToast, showTxToast } from '$lib/components/Toast.svelte';
