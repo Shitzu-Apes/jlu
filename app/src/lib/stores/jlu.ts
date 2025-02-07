@@ -39,7 +39,7 @@ async function fetchSolanaBalance(publicKey: PublicKey): Promise<FixedNumber | n
 
 		try {
 			const account = await getAccount(connection, associatedTokenAddress);
-			return new FixedNumber(account.amount.toString(), 9); // Solana JLU uses 9 decimals
+			return new FixedNumber(account.amount, 9);
 		} catch (err) {
 			// Account doesn't exist yet (no tokens) or other error
 			console.error('Failed to fetch Solana JLU balance:', err);

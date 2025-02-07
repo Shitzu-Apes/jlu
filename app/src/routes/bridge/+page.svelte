@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { AnchorProvider } from '@coral-xyz/anchor';
 	import { ChainKind, getClient, omniAddress, OmniBridgeAPI, type Chain } from 'omni-bridge-sdk';
 	import { writable, get } from 'svelte/store';
 	import { match } from 'ts-pattern';
@@ -173,9 +172,8 @@
 				const tokenAddress = omniAddress(ChainKind.Sol, import.meta.env.VITE_JLU_TOKEN_ID_SOLANA);
 
 				const fee = await api.getFee(sender, recipient, tokenAddress);
-				console.log(amount)
 				return client.initTransfer({
-					amount: BigInt(amount)/BigInt(1000000000n),
+					amount: BigInt(amount) / BigInt(1_000_000_000n),
 					fee: BigInt(fee.transferred_token_fee ?? 0),
 					nativeFee: BigInt(fee.native_token_fee),
 					recipient,
@@ -192,6 +190,9 @@
 		if (!transferEvent) {
 			throw new Error('Failed to initiate transfer');
 		}
+		if (typeof transferEvent === 'string') {
+			throw new Error('Failed to initiate transfer');
+		}
 
 		const chain: Chain = match($sourceNetwork$)
 			.with('near', () => 'Near' as const)
@@ -199,15 +200,19 @@
 			.with('base', () => 'Base' as const)
 			.exhaustive();
 
-		// Show the transfer status component
-		const transfer = transfers.getTransfer(chain, transferEvent.transfer_message.origin_nonce);
-		if (!transfer) {
-			showTransferStatus = true;
-		}
-	}
+		// Add the transfer to the store and show status
+		transfers.addTransfer({
+			chain,
+			nonce: transferEvent.transfer_message.origin_nonce,
+			amount: $amount$.toU128(),
+			status: 'Initialized',
+			timestamp: Date.now()
+		});
 
-	let showTransferStatus = false;
-	$: latestTransfer = $transfers[0];
+		// Reset input fields after successful bridge
+		$amountValue$ = undefined;
+		$recipientAddress$ = '';
+	}
 
 	function isValidAddress(address: string, network: Network): boolean {
 		if (!address) return false;
@@ -364,7 +369,7 @@
 			<Button
 				onClick={handleBridge}
 				loading={$isLoading$}
-				disabled={false}
+				disabled={!needsWalletConnection && !canBridge}
 				class="w-full"
 			>
 				{#if needsWalletConnection}
@@ -383,36 +388,12 @@
 				{/if}
 			</Button>
 
-			{#if showTransferStatus && latestTransfer}
-				<div class="p-4 bg-purple-900/30 rounded-xl">
-					<TransferStatus
-						chain={latestTransfer.chain}
-						nonce={latestTransfer.nonce}
-						amount={latestTransfer.amount}
-					/>
-				</div>
-			{/if}
-
 			{#if $transfers.length > 0}
 				<div class="flex flex-col gap-2">
 					<div class="text-sm text-purple-200/70">Recent Transfers</div>
 					<div class="flex flex-col gap-1.5">
 						{#each $transfers as transfer}
-							<div class="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg">
-								<div class="flex flex-col gap-1">
-									<div class="text-sm font-medium">
-										{transfer.amount} JLU
-									</div>
-									<div class="text-xs text-purple-200/70">
-										{new Date(transfer.timestamp).toLocaleString()}
-									</div>
-								</div>
-								<TransferStatus
-									chain={transfer.chain}
-									nonce={transfer.nonce}
-									amount={transfer.amount}
-								/>
-							</div>
+							<TransferStatus {transfer} />
 						{/each}
 					</div>
 				</div>
