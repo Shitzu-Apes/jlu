@@ -9,7 +9,7 @@
 	import TransferStatus from '$lib/components/TransferStatus.svelte';
 	import { nearWallet } from '$lib/near';
 	import { solanaWallet } from '$lib/solana/wallet';
-	import { jluBalance$ } from '$lib/stores/jlu';
+	import { jluBalance$, updateJluBalance } from '$lib/stores/jlu';
 	import { transfers } from '$lib/stores/transfers';
 
 	const { accountId$, isLoading$, selector$ } = nearWallet;
@@ -41,6 +41,36 @@
 	$: amount$ = amount?.u128$;
 	let amountValue$ = writable<string | undefined>();
 	const recipientAddress$ = writable<string>('');
+
+	type InitTransferEvent = {
+		id: {
+			origin_chain: Chain;
+			origin_nonce: number;
+		};
+		initialized: {
+			Solana?: {
+				slot: number;
+				block_timestamp_seconds: number;
+				signature: string;
+			};
+			Near?: {
+				block_height: number;
+				block_timestamp_seconds: number;
+				transaction_hash: string;
+			};
+		};
+		transfer_message: {
+			token: string;
+			amount: string;
+			sender: string;
+			recipient: string;
+			fee: {
+				fee: string;
+				native_fee: string;
+			};
+			msg: string;
+		};
+	};
 
 	function handleSwapNetworks() {
 		const source = $sourceNetwork$;
@@ -121,7 +151,7 @@
 		const amount = $amount$.toU128();
 		const api = new OmniBridgeAPI();
 
-		const transferEvent = await match($sourceNetwork$)
+		const rawTransferEvent = await match($sourceNetwork$)
 			.with('near', async () => {
 				const selector = await $selector$;
 
@@ -186,11 +216,8 @@
 			})
 			.exhaustive();
 
-		console.log('[transferEvent]', transferEvent);
-		if (!transferEvent) {
-			throw new Error('Failed to initiate transfer');
-		}
-		if (typeof transferEvent === 'string') {
+		console.log('[transferEvent]', rawTransferEvent);
+		if (!rawTransferEvent) {
 			throw new Error('Failed to initiate transfer');
 		}
 
@@ -200,18 +227,51 @@
 			.with('base', () => 'Base' as const)
 			.exhaustive();
 
-		// Add the transfer to the store and show status
-		transfers.addTransfer({
-			chain,
-			nonce: transferEvent.transfer_message.origin_nonce,
-			amount: $amount$.toU128(),
-			status: 'Initialized',
-			timestamp: Date.now()
-		});
+		if (typeof rawTransferEvent === 'string') {
+			// Wait for transaction to be indexed
+			let data: InitTransferEvent[] = [];
+			for (let i = 0; i < 10; i++) {
+				// Try up to 10 times
+				await new Promise((resolve) => setTimeout(resolve, 2_000)); // Wait 2s between attempts
+				const response = await fetch(
+					`${match(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet')
+						.with('mainnet', () => 'https://mainnet.api.bridge.nearone.org/api/v1')
+						.with('testnet', () => 'https://testnet.api.bridge.nearone.org/api/v1')
+						.exhaustive()}/transfers/?offset=0&limit=1&transaction_id=${rawTransferEvent}`
+				);
+				data = await response.json<InitTransferEvent[]>();
+				if (data.length > 0) break; // Found the transfer, stop retrying
+			}
+
+			if (data.length === 0) {
+				throw new Error('Failed to fetch transfer data after multiple retries');
+			}
+
+			transfers.addTransfer({
+				chain,
+				nonce: data[0].id.origin_nonce,
+				amount: String(data[0].transfer_message.amount),
+				status: 'Initialized',
+				timestamp: Date.now(),
+				sender: data[0].transfer_message.sender,
+				recipient: data[0].transfer_message.recipient
+			});
+		} else {
+			transfers.addTransfer({
+				chain,
+				nonce: rawTransferEvent.transfer_message.origin_nonce,
+				amount: String(rawTransferEvent.transfer_message.amount),
+				status: 'Initialized',
+				timestamp: Date.now(),
+				sender: rawTransferEvent.transfer_message.sender,
+				recipient: rawTransferEvent.transfer_message.recipient
+			});
+		}
 
 		// Reset input fields after successful bridge
 		$amountValue$ = undefined;
 		$recipientAddress$ = '';
+		updateJluBalance();
 	}
 
 	function isValidAddress(address: string, network: Network): boolean {
@@ -392,7 +452,7 @@
 				<div class="flex flex-col gap-2">
 					<div class="text-sm text-purple-200/70">Recent Transfers</div>
 					<div class="flex flex-col gap-1.5">
-						{#each $transfers as transfer}
+						{#each $transfers as transfer (transfer.timestamp)}
 							<TransferStatus {transfer} />
 						{/each}
 					</div>

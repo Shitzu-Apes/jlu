@@ -1,10 +1,10 @@
+import { AnchorProvider, type Provider } from '@coral-xyz/anchor';
 import type { SignerWalletAdapter } from '@solana/wallet-adapter-base';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, Connection, type PublicKey } from '@solana/web3.js';
 import { derived, get, writable } from 'svelte/store';
-import { AnchorProvider, type Provider } from '@coral-xyz/anchor'; // Import AnchorProvider
-import { browser } from '$app/environment'; // For SvelteKit
 
+import { browser } from '$app/environment'; // For SvelteKit
 import { showToast } from '$lib/components/Toast.svelte';
 
 const network = import.meta.env.VITE_NETWORK_ID === 'mainnet' ? 'mainnet-beta' : 'devnet';

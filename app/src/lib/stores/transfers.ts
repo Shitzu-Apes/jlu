@@ -9,6 +9,8 @@ export type Transfer = {
 	amount: string;
 	status: TransferStatus;
 	timestamp: number;
+	sender: string; // OmniAddress format: 'chain:address'
+	recipient: string; // OmniAddress format: 'chain:address'
 };
 
 function createTransfersStore() {
