@@ -121,49 +121,53 @@ export const activeBalance$ = derived<[typeof jluBalance$], FixedNumber | null>(
 );
 
 // Function to manually update balance
-export async function updateJluBalance(diff?: FixedNumber) {
-	const account = get(account$);
-	const publicKey = get(publicKey$);
-	const wallet = get(evmWallet$);
+let updateTimeoutId: ReturnType<typeof setTimeout>;
+export function updateJluBalance(diff?: FixedNumber): void {
+	clearTimeout(updateTimeoutId);
+	updateTimeoutId = setTimeout(async () => {
+		const account = get(account$);
+		const publicKey = get(publicKey$);
+		const wallet = get(evmWallet$);
 
-	// Update NEAR balance if connected
-	if (account?.accountId) {
-		if (diff) {
-			jluBalance$.update((balance) => ({
-				...balance,
-				near: balance.near ? balance.near.add(diff) : diff
-			}));
-		} else {
-			const nearBalance = await fetchNearBalance(account.accountId);
-			jluBalance$.update((b) => ({ ...b, near: nearBalance }));
+		// Update NEAR balance if connected
+		if (account?.accountId) {
+			if (diff) {
+				jluBalance$.update((balance) => ({
+					...balance,
+					near: balance.near ? balance.near.add(diff) : diff
+				}));
+			} else {
+				const nearBalance = await fetchNearBalance(account.accountId);
+				jluBalance$.update((b) => ({ ...b, near: nearBalance }));
+			}
 		}
-	}
 
-	// Update Solana balance if connected
-	if (publicKey) {
-		if (diff) {
-			jluBalance$.update((balance) => ({
-				...balance,
-				solana: balance.solana ? balance.solana.add(diff) : diff
-			}));
-		} else {
-			const solanaBalance = await fetchSolanaBalance(publicKey);
-			jluBalance$.update((b) => ({ ...b, solana: solanaBalance }));
+		// Update Solana balance if connected
+		if (publicKey) {
+			if (diff) {
+				jluBalance$.update((balance) => ({
+					...balance,
+					solana: balance.solana ? balance.solana.add(diff) : diff
+				}));
+			} else {
+				const solanaBalance = await fetchSolanaBalance(publicKey);
+				jluBalance$.update((b) => ({ ...b, solana: solanaBalance }));
+			}
 		}
-	}
 
-	// Update Base balance if connected
-	if (wallet.status === 'connected') {
-		if (diff) {
-			jluBalance$.update((balance) => ({
-				...balance,
-				base: balance.base ? balance.base.add(diff) : diff
-			}));
-		} else {
-			const baseBalance = await fetchBaseBalance(wallet.address);
-			jluBalance$.update((b) => ({ ...b, base: baseBalance }));
+		// Update Base balance if connected
+		if (wallet.status === 'connected') {
+			if (diff) {
+				jluBalance$.update((balance) => ({
+					...balance,
+					base: balance.base ? balance.base.add(diff) : diff
+				}));
+			} else {
+				const baseBalance = await fetchBaseBalance(wallet.address);
+				jluBalance$.update((b) => ({ ...b, base: baseBalance }));
+			}
 		}
-	}
+	}, 1000);
 }
 
 export { jluBalance$ };
