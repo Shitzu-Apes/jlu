@@ -2,8 +2,16 @@
 	import { getConnectorClient, type Config } from '@wagmi/core';
 	import { base, baseSepolia } from '@wagmi/core/chains';
 	import { BrowserProvider, JsonRpcSigner } from 'ethers';
-	import { ChainKind, getClient, omniAddress, OmniBridgeAPI, type Chain } from 'omni-bridge-sdk';
+	import {
+		ChainKind,
+		getClient,
+		omniAddress,
+		OmniBridgeAPI,
+		type Chain,
+		type Transfer
+	} from 'omni-bridge-sdk';
 	import { writable, get } from 'svelte/store';
+	import { slide } from 'svelte/transition';
 	import { match } from 'ts-pattern';
 
 	import { showWalletSelector } from '$lib/auth';
@@ -46,36 +54,6 @@
 	$: amount$ = amount?.u128$;
 	let amountValue$ = writable<string | undefined>();
 	const recipientAddress$ = writable<string>('');
-
-	type InitTransferEvent = {
-		id: {
-			origin_chain: Chain;
-			origin_nonce: number;
-		};
-		initialized: {
-			Solana?: {
-				slot: number;
-				block_timestamp_seconds: number;
-				signature: string;
-			};
-			Near?: {
-				block_height: number;
-				block_timestamp_seconds: number;
-				transaction_hash: string;
-			};
-		};
-		transfer_message: {
-			token: string;
-			amount: string;
-			sender: string;
-			recipient: string;
-			fee: {
-				fee: string;
-				native_fee: string;
-			};
-			msg: string;
-		};
-	};
 
 	function handleSwapNetworks() {
 		const source = $sourceNetwork$;
@@ -194,8 +172,8 @@
 				const fee = await api.getFee(sender, recipient, tokenAddress);
 				return client.initTransfer({
 					amount: BigInt(amount),
-					fee: BigInt(fee.transferred_token_fee ?? 0),
-					nativeFee: BigInt(fee.native_token_fee),
+					fee: fee.transferred_token_fee ?? 0n,
+					nativeFee: fee.native_token_fee ?? 0n,
 					recipient,
 					tokenAddress
 				});
@@ -226,9 +204,9 @@
 
 				const fee = await api.getFee(sender, recipient, tokenAddress);
 				return client.initTransfer({
-					amount: BigInt(amount) / BigInt(1_000_000_000n),
-					fee: BigInt(fee.transferred_token_fee ?? 0),
-					nativeFee: BigInt(fee.native_token_fee),
+					amount: BigInt(amount) / 1_000_000_000n,
+					fee: fee.transferred_token_fee ?? 0n,
+					nativeFee: fee.native_token_fee ?? 0n,
 					recipient,
 					tokenAddress
 				});
@@ -276,8 +254,8 @@
 				const fee = await api.getFee(sender, recipient, tokenAddress);
 				return client.initTransfer({
 					amount: BigInt(amount),
-					fee: BigInt(fee.transferred_token_fee ?? 0),
-					nativeFee: BigInt(fee.native_token_fee),
+					fee: fee.transferred_token_fee ?? 0n,
+					nativeFee: fee.native_token_fee ?? 0n,
 					recipient,
 					tokenAddress
 				});
@@ -297,45 +275,58 @@
 
 		if (typeof rawTransferEvent === 'string') {
 			// Wait for transaction to be indexed
-			let data: InitTransferEvent[] = [];
-			for (let i = 0; i < 10; i++) {
+			let data: Transfer | undefined;
+			for (let i = 0; i < 20; i++) {
 				// Try up to 10 times
-				await new Promise((resolve) => setTimeout(resolve, 2_000)); // Wait 2s between attempts
-				const response = await fetch(
-					`${match(import.meta.env.VITE_NETWORK_ID as 'mainnet' | 'testnet')
-						.with('mainnet', () => 'https://mainnet.api.bridge.nearone.org/api/v1')
-						.with('testnet', () => 'https://testnet.api.bridge.nearone.org/api/v1')
-						.exhaustive()}/transfers/?offset=0&limit=1&transaction_id=${rawTransferEvent}`
-				);
-				data = await response.json<InitTransferEvent[]>();
-				if (data.length > 0) break; // Found the transfer, stop retrying
+				await new Promise((resolve) => setTimeout(resolve, 3_000)); // Wait 2s between attempts
+				try {
+					// First find the transfer to get the nonce
+					const transfers = await api.findOmniTransfers({ transaction_id: rawTransferEvent });
+					if (transfers.length > 0) {
+						// Then get the full transfer data
+						data = await api.getTransfer(
+							transfers[0].id.origin_chain,
+							transfers[0].id.origin_nonce
+						);
+						break;
+					}
+				} catch (err) {
+					console.error('Failed to fetch transfer:', err);
+					continue;
+				}
 			}
 
-			if (data.length === 0) {
+			if (!data) {
 				throw new Error('Failed to fetch transfer data after multiple retries');
 			}
 			console.log('[data]', data);
 
-			transfers.addTransfer({
-				chain,
-				nonce: data[0].id.origin_nonce,
-				amount: String(data[0].transfer_message.amount),
-				status: 'Initialized',
-				timestamp: Date.now(),
-				sender: data[0].transfer_message.sender,
-				recipient: data[0].transfer_message.recipient
-			});
+			transfers.addTransfers([data]);
 		} else {
 			console.log('[rawTransferEvent]', rawTransferEvent);
-			transfers.addTransfer({
-				chain,
-				nonce: rawTransferEvent.transfer_message.origin_nonce,
-				amount: String(rawTransferEvent.transfer_message.amount),
-				status: 'Initialized',
-				timestamp: Date.now(),
-				sender: rawTransferEvent.transfer_message.sender,
-				recipient: rawTransferEvent.transfer_message.recipient
-			});
+			// For non-string transfer events, we need to wait for them to be indexed
+			// This ensures we have the full transfer data structure
+			let data: Transfer | undefined;
+			for (let i = 0; i < 20; i++) {
+				// Try up to 10 times
+				await new Promise((resolve) => setTimeout(resolve, 3_000)); // Wait 2s between attempts
+				try {
+					data = await api.getTransfer(chain, rawTransferEvent.transfer_message.origin_nonce);
+					if (data) {
+						break;
+					}
+				} catch (err) {
+					console.error('Failed to fetch transfer:', err);
+					continue;
+				}
+			}
+
+			if (!data) {
+				throw new Error('Failed to fetch transfer data after multiple retries');
+			}
+			console.log('[data]', data);
+
+			transfers.addTransfers([data]);
 		}
 
 		// Reset input fields after successful bridge
@@ -379,6 +370,64 @@
 		.with('solana', () => !$publicKey$)
 		.with('base', () => $evmWallet$.status !== 'connected')
 		.exhaustive();
+
+	// Add these reactive statements for each wallet
+	$: if ($accountId$) {
+		loadNearTransfers($accountId$);
+	} else {
+		transfers.removeTransfersByChain('Near');
+	}
+
+	$: if ($publicKey$) {
+		loadSolanaTransfers($publicKey$.toBase58());
+	} else {
+		transfers.removeTransfersByChain('Sol');
+	}
+
+	$: if ($evmWallet$.status === 'connected') {
+		loadBaseTransfers($evmWallet$.address);
+	} else {
+		transfers.removeTransfersByChain('Base');
+	}
+
+	async function loadNearTransfers(accountId: string) {
+		const api = new OmniBridgeAPI();
+		try {
+			const nearTransfers = await api.findOmniTransfers({
+				sender: `near:${accountId}`,
+				limit: 50
+			});
+			transfers.addTransfers(nearTransfers);
+		} catch (err) {
+			console.error('Failed to load NEAR transfers:', err);
+		}
+	}
+
+	async function loadSolanaTransfers(publicKey: string) {
+		const api = new OmniBridgeAPI();
+		try {
+			const solTransfers = await api.findOmniTransfers({
+				sender: `sol:${publicKey}`,
+				limit: 50
+			});
+			transfers.addTransfers(solTransfers);
+		} catch (err) {
+			console.error('Failed to load Solana transfers:', err);
+		}
+	}
+
+	async function loadBaseTransfers(address: string) {
+		const api = new OmniBridgeAPI();
+		try {
+			const baseTransfers = await api.findOmniTransfers({
+				sender: `base:${address}`,
+				limit: 50
+			});
+			transfers.addTransfers(baseTransfers);
+		} catch (err) {
+			console.error('Failed to load Base transfers:', err);
+		}
+	}
 </script>
 
 <main class="w-full max-w-2xl mx-auto py-6 px-4">
@@ -508,7 +557,7 @@
 			<Button
 				onClick={handleBridge}
 				loading={$isLoading$}
-				disabled={!needsWalletConnection && !canBridge}
+				disabled={(!needsWalletConnection && !canBridge) || $isLoading$}
 				class="w-full"
 			>
 				{#if needsWalletConnection}
@@ -529,8 +578,10 @@
 				<div class="flex flex-col gap-2">
 					<div class="text-sm text-purple-200/70">Recent Transfers</div>
 					<div class="flex flex-col gap-1.5">
-						{#each $transfers as transfer (transfer.timestamp)}
-							<TransferStatus {transfer} />
+						{#each $transfers as transfer (transfer.id.origin_chain + ':' + transfer.id.origin_nonce)}
+							<div in:slide|global class="flex flex-col">
+								<TransferStatus {transfer} />
+							</div>
 						{/each}
 					</div>
 				</div>

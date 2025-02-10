@@ -1,53 +1,59 @@
-import type { Chain, TransferStatus } from 'omni-bridge-sdk';
-import { writable, get } from 'svelte/store';
+import { type Chain, type Transfer } from 'omni-bridge-sdk';
+import { writable } from 'svelte/store';
 
-import { browser } from '$app/environment';
-
-export type Transfer = {
-	chain: Chain;
-	nonce: number;
-	amount: string;
-	status: TransferStatus;
-	timestamp: number;
-	sender: string; // OmniAddress format: 'chain:address'
-	recipient: string; // OmniAddress format: 'chain:address'
-};
-
-function createTransfersStore() {
-	// Load initial state from localStorage
-	const initialState: Transfer[] = browser
-		? JSON.parse(localStorage.getItem('transfers') || '[]')
-		: [];
-
-	const { subscribe, update } = writable<Transfer[]>(initialState);
-
-	return {
-		subscribe,
-		addTransfer: (transfer: Transfer) => {
-			update((transfers) => {
-				const newTransfers = [transfer, ...transfers];
-				if (browser) {
-					localStorage.setItem('transfers', JSON.stringify(newTransfers));
-				}
-				return newTransfers;
-			});
-		},
-		updateTransfer: (chain: Chain, nonce: number, status: Transfer['status']) => {
-			update((transfers) => {
-				const newTransfers = transfers.map((t) =>
-					t.chain === chain && t.nonce === nonce ? { ...t, status } : t
-				);
-				if (browser) {
-					localStorage.setItem('transfers', JSON.stringify(newTransfers));
-				}
-				return newTransfers;
-			});
-		},
-		getTransfer: (chain: Chain, nonce: number) => {
-			const transfers = get({ subscribe });
-			return transfers.find((t) => t.chain === chain && t.nonce === nonce);
-		}
-	};
+function getTransferKey(transfer: Transfer): string {
+	return `${transfer.id.origin_chain}:${transfer.id.origin_nonce}`;
 }
 
-export const transfers = createTransfersStore();
+function sortTransfers(transfers: Transfer[]): Transfer[] {
+	return transfers.sort((a, b) => {
+		const aTime =
+			a.initialized?.NearReceipt?.block_timestamp_seconds ??
+			a.initialized?.EVMLog?.block_timestamp_seconds ??
+			a.initialized?.Solana?.block_timestamp_seconds ??
+			0;
+		const bTime =
+			b.initialized?.NearReceipt?.block_timestamp_seconds ??
+			b.initialized?.EVMLog?.block_timestamp_seconds ??
+			b.initialized?.Solana?.block_timestamp_seconds ??
+			0;
+		return bTime - aTime;
+	});
+}
+
+const { subscribe, update, set } = writable<Transfer[]>([]);
+
+export const transfers = {
+	subscribe,
+	addTransfers: (newTransfers: Transfer[]) => {
+		update((existingTransfers) => {
+			// Create a map of existing transfers using the unique key
+			const existingKeys = new Set(existingTransfers.map(getTransferKey));
+
+			// Filter out duplicates from new transfers
+			const uniqueNewTransfers = newTransfers.filter(
+				(transfer) => !existingKeys.has(getTransferKey(transfer))
+			);
+
+			// Combine and sort
+			const combined = [...uniqueNewTransfers, ...existingTransfers];
+			return sortTransfers(combined);
+		});
+	},
+	removeTransfersByChain: (chain: Chain) => {
+		update((transfers) => transfers.filter((t) => t.id.origin_chain !== chain));
+	},
+	updateTransfer: (transfer: { event: Transfer; chain: Chain }) => {
+		update((transfers) =>
+			sortTransfers(
+				transfers.map((t) =>
+					t.id.origin_chain === transfer.event.id.origin_chain &&
+					t.id.origin_nonce === transfer.event.id.origin_nonce
+						? transfer.event
+						: t
+				)
+			)
+		);
+	},
+	clear: () => set([])
+};
