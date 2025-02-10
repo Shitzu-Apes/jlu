@@ -428,6 +428,31 @@
 			console.error('Failed to load Base transfers:', err);
 		}
 	}
+
+	let isLoadingMore = false;
+	let visibleCount = 10;
+
+	function handleLoadMore() {
+		if (isLoadingMore) return;
+		isLoadingMore = true;
+		try {
+			visibleCount += 10;
+		} finally {
+			isLoadingMore = false;
+		}
+	}
+
+	$: visibleTransfers = $transfers.slice(0, visibleCount);
+	$: hasMore = visibleCount < $transfers.length;
+
+	// Load initial transfers when wallets change
+	$: if ($accountId$ || $publicKey$ || $evmWallet$.status === 'connected') {
+		transfers.clear();
+		if ($accountId$) loadNearTransfers($accountId$);
+		if ($publicKey$) loadSolanaTransfers($publicKey$.toBase58());
+		if ($evmWallet$.status === 'connected') loadBaseTransfers($evmWallet$.address);
+		visibleCount = 10;
+	}
 </script>
 
 <main class="w-full max-w-2xl mx-auto py-6 px-4">
@@ -578,11 +603,25 @@
 				<div class="flex flex-col gap-2">
 					<div class="text-sm text-purple-200/70">Recent Transfers</div>
 					<div class="flex flex-col gap-1.5">
-						{#each $transfers as transfer (transfer.id.origin_chain + ':' + transfer.id.origin_nonce)}
+						{#each visibleTransfers as transfer (transfer.id.origin_chain + ':' + transfer.id.origin_nonce)}
 							<div in:slide|global class="flex flex-col">
 								<TransferStatus {transfer} />
 							</div>
 						{/each}
+						{#if hasMore}
+							<button
+								on:click={handleLoadMore}
+								disabled={isLoadingMore}
+								class="mt-2 px-4 py-2 rounded-lg bg-purple-900/20 hover:bg-purple-900/30 text-purple-200/70 hover:text-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+							>
+								{#if isLoadingMore}
+									<div class="i-mdi:loading animate-spin" />
+									Loading...
+								{:else}
+									Load More
+								{/if}
+							</button>
+						{/if}
 					</div>
 				</div>
 			{/if}
