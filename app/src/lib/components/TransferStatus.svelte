@@ -54,23 +54,6 @@
 			.otherwise(() => '');
 	}
 
-	function formatHash(hash: string): string {
-		return `${hash.slice(0, 8)}...${hash.slice(-6)}`;
-	}
-
-	function getTransactionHash(transfer: Transfer): { chain: string; hash: string } | null {
-		if (transfer.finalised?.NearReceipt?.transaction_hash) {
-			return { chain: 'near', hash: transfer.finalised.NearReceipt.transaction_hash };
-		}
-		if (transfer.finalised?.Solana?.signature) {
-			return { chain: 'sol', hash: transfer.finalised.Solana.signature };
-		}
-		if (transfer.finalised?.EVMLog?.transaction_hash) {
-			return { chain: 'base', hash: transfer.finalised.EVMLog.transaction_hash };
-		}
-		return null;
-	}
-
 	function formatAddress(address: string): string {
 		if (address.length > 24) {
 			return `${address.slice(0, 12)}...${address.slice(-4)}`;
@@ -144,28 +127,6 @@
 		</div>
 	</div>
 
-	<!-- Transaction Hash -->
-	{#if transfer.finalised != null}
-		{@const txInfo = getTransactionHash(transfer)}
-		{#if txInfo}
-			<div class="flex items-center gap-2 text-sm">
-				<span class="text-purple-200/70">Tx:</span>
-				<div class="flex items-center gap-1.5">
-					<img src={getChainIcon(txInfo.chain)} alt={txInfo.chain} class="w-4 h-4 rounded-full" />
-					<a
-						href={getExplorerUrl(txInfo.chain, txInfo.hash, 'tx')}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="text-purple-100 hover:text-purple-300 transition-colors flex items-center gap-1 font-mono text-xs"
-					>
-						<span>{formatHash(txInfo.hash)}</span>
-						<div class="i-mdi:open-in-new text-sm opacity-70" />
-					</a>
-				</div>
-			</div>
-		{/if}
-	{/if}
-
 	<!-- Sender and Recipient -->
 	<div class="flex flex-col gap-1.5 text-sm">
 		{#if transfer.transfer_message.sender}
@@ -183,6 +144,40 @@
 						<span>{formatAddress(senderAddress)}</span>
 						<div class="i-mdi:open-in-new text-sm opacity-70" />
 					</a>
+					{#if transfer.initialized?.NearReceipt?.transaction_hash}
+						<a
+							href={getExplorerUrl('near', transfer.initialized.NearReceipt.transaction_hash, 'tx')}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-200/70 hover:text-purple-100 transition-colors"
+							title="View source transaction"
+							aria-label="View source transaction"
+						>
+							<div class="i-mdi:link-variant text-sm" />
+						</a>
+					{:else if transfer.initialized?.Solana?.signature}
+						<a
+							href={getExplorerUrl('sol', transfer.initialized.Solana.signature, 'tx')}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-200/70 hover:text-purple-100 transition-colors"
+							title="View source transaction"
+							aria-label="View source transaction"
+						>
+							<div class="i-mdi:link-variant text-sm" />
+						</a>
+					{:else if transfer.initialized?.EVMLog?.transaction_hash}
+						<a
+							href={getExplorerUrl('base', transfer.initialized.EVMLog.transaction_hash, 'tx')}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-200/70 hover:text-purple-100 transition-colors"
+							title="View source transaction"
+							aria-label="View source transaction"
+						>
+							<div class="i-mdi:link-variant text-sm" />
+						</a>
+					{/if}
 				</div>
 			</div>
 		{/if}
@@ -205,6 +200,40 @@
 						<span>{formatAddress(recipientAddress)}</span>
 						<div class="i-mdi:open-in-new text-sm opacity-70" />
 					</a>
+					{#if transfer.finalised?.NearReceipt?.transaction_hash}
+						<a
+							href={getExplorerUrl('near', transfer.finalised.NearReceipt.transaction_hash, 'tx')}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-200/70 hover:text-purple-100 transition-colors"
+							title="View destination transaction"
+							aria-label="View destination transaction"
+						>
+							<div class="i-mdi:link-variant text-sm" />
+						</a>
+					{:else if transfer.finalised?.Solana?.signature}
+						<a
+							href={getExplorerUrl('sol', transfer.finalised.Solana.signature, 'tx')}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-200/70 hover:text-purple-100 transition-colors"
+							title="View destination transaction"
+							aria-label="View destination transaction"
+						>
+							<div class="i-mdi:link-variant text-sm" />
+						</a>
+					{:else if transfer.finalised?.EVMLog?.transaction_hash}
+						<a
+							href={getExplorerUrl('base', transfer.finalised.EVMLog.transaction_hash, 'tx')}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="text-purple-200/70 hover:text-purple-100 transition-colors"
+							title="View destination transaction"
+							aria-label="View destination transaction"
+						>
+							<div class="i-mdi:link-variant text-sm" />
+						</a>
+					{/if}
 				</div>
 			</div>
 		{/if}
