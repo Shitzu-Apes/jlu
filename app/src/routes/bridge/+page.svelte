@@ -25,7 +25,7 @@
 	import { jluBalance$, updateJluBalance } from '$lib/stores/jlu';
 	import { transfers } from '$lib/stores/transfers';
 
-	const { accountId$, isLoading$, selector$ } = nearWallet;
+	const { accountId$, selector$ } = nearWallet;
 	const { publicKey$ } = solanaWallet;
 
 	type Network = 'near' | 'solana' | 'base';
@@ -54,6 +54,7 @@
 	$: amount$ = amount?.u128$;
 	let amountValue$ = writable<string | undefined>();
 	const recipientAddress$ = writable<string>('');
+	const isLoading$ = writable<boolean>(false);
 
 	function handleSwapNetworks() {
 		const source = $sourceNetwork$;
@@ -149,6 +150,7 @@
 			return;
 		}
 
+		$isLoading$ = true;
 		const amount = $amount$.toU128();
 		const api = new OmniBridgeAPI();
 
@@ -332,7 +334,7 @@
 		// Reset input fields after successful bridge
 		$amountValue$ = undefined;
 		$recipientAddress$ = '';
-		updateJluBalance();
+		return updateJluBalance();
 	}
 
 	function isValidAddress(address: string, network: Network): boolean {
@@ -579,12 +581,7 @@
 				</div>
 			</div>
 
-			<Button
-				onClick={handleBridge}
-				loading={$isLoading$}
-				disabled={(!needsWalletConnection && !canBridge) || $isLoading$}
-				class="w-full"
-			>
+			<Button onClick={handleBridge} disabled={!needsWalletConnection && !canBridge} class="w-full">
 				{#if needsWalletConnection}
 					Connect Wallet
 				{:else if !$amount$}
