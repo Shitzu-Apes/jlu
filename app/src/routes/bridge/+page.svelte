@@ -54,7 +54,6 @@
 	$: amount$ = amount?.u128$;
 	let amountValue$ = writable<string | undefined>();
 	const recipientAddress$ = writable<string>('');
-	const isLoading$ = writable<boolean>(false);
 
 	function handleSwapNetworks() {
 		const source = $sourceNetwork$;
@@ -146,13 +145,22 @@
 	}
 
 	async function handleBridge() {
+		if (needsWalletConnection) {
+			showWalletSelector($sourceNetwork$);
+			return;
+		}
+
 		if (!$amount$) {
 			return;
 		}
 
-		$isLoading$ = true;
 		const amount = $amount$.toU128();
-		const api = new OmniBridgeAPI();
+		const api = new OmniBridgeAPI({
+			baseUrl:
+				import.meta.env.VITE_NETWORK_ID === 'mainnet'
+					? 'https://mainnet.api.bridge.nearone.org'
+					: 'https://testnet.api.bridge.nearone.org'
+		});
 
 		const rawTransferEvent = await match($sourceNetwork$)
 			.with('near', async () => {
@@ -362,7 +370,6 @@
 	$: canBridge =
 		Boolean($amount$) &&
 		walletConnected &&
-		!$isLoading$ &&
 		$sourceNetwork$ !== $destinationNetwork$ &&
 		(!$jluBalance$ || ($amount$ && $amount$.valueOf() <= currentBalance)) &&
 		isValidAddress($recipientAddress$, $destinationNetwork$);
@@ -393,7 +400,12 @@
 	}
 
 	async function loadNearTransfers(accountId: string) {
-		const api = new OmniBridgeAPI();
+		const api = new OmniBridgeAPI({
+			baseUrl:
+				import.meta.env.VITE_NETWORK_ID === 'mainnet'
+					? 'https://mainnet.api.bridge.nearone.org'
+					: 'https://testnet.api.bridge.nearone.org'
+		});
 		try {
 			const nearTransfers = await api.findOmniTransfers({
 				sender: `near:${accountId}`,
@@ -406,7 +418,12 @@
 	}
 
 	async function loadSolanaTransfers(publicKey: string) {
-		const api = new OmniBridgeAPI();
+		const api = new OmniBridgeAPI({
+			baseUrl:
+				import.meta.env.VITE_NETWORK_ID === 'mainnet'
+					? 'https://mainnet.api.bridge.nearone.org'
+					: 'https://testnet.api.bridge.nearone.org'
+		});
 		try {
 			const solTransfers = await api.findOmniTransfers({
 				sender: `sol:${publicKey}`,
@@ -419,7 +436,12 @@
 	}
 
 	async function loadBaseTransfers(address: string) {
-		const api = new OmniBridgeAPI();
+		const api = new OmniBridgeAPI({
+			baseUrl:
+				import.meta.env.VITE_NETWORK_ID === 'mainnet'
+					? 'https://mainnet.api.bridge.nearone.org'
+					: 'https://testnet.api.bridge.nearone.org'
+		});
 		try {
 			const baseTransfers = await api.findOmniTransfers({
 				sender: `base:${address}`,
@@ -626,9 +648,13 @@
 			<div class="flex flex-col gap-1.5 text-sm text-purple-200/70">
 				<p>Note:</p>
 				<ul class="list-disc list-inside flex flex-col gap-1">
-					<li>Currently bridging from NEAR and Solana networks is supported</li>
 					<li>Bridge fees may apply depending on the source and destination network</li>
-					<li>Bridging time should be less than 1 minute</li>
+					<li>Estimated transfer times:</li>
+					<ul class="list-[circle] list-inside ml-4 flex flex-col gap-1">
+						<li>NEAR to EVM/Solana: ~30 seconds</li>
+						<li>Solana to NEAR: ~30 seconds</li>
+						<li>EVM to NEAR: ~20 minutes</li>
+					</ul>
 				</ul>
 			</div>
 		</div>

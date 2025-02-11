@@ -8,8 +8,7 @@ import { browser } from '$app/environment'; // For SvelteKit
 import { showToast } from '$lib/components/Toast.svelte';
 
 const network = import.meta.env.VITE_NETWORK_ID === 'mainnet' ? 'mainnet-beta' : 'devnet';
-const endpoint = clusterApiUrl(network);
-const connection = new Connection(endpoint);
+const connection = new Connection(import.meta.env.VITE_SOLANA_RPC_URL ?? clusterApiUrl(network));
 
 class SolanaWallet {
 	private _wallets$ = writable<SignerWalletAdapter[]>([]);

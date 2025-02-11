@@ -68,7 +68,7 @@
 				loading = false;
 			}
 		}}
-		{disabled}
+		disabled={disabled || loading}
 		class:rounded-xl={!className.includes('rounded') && type !== 'custom'}
 		class="{className} {getBaseStyles(type)} {getLayoutStyles(type, size)}"
 		{...$$restProps}

@@ -1,6 +1,7 @@
 <script lang="ts">
+	import dayjs from 'dayjs';
 	import { OmniBridgeAPI, type Transfer } from 'omni-bridge-sdk';
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { match } from 'ts-pattern';
 
 	import { updateJluBalance } from '$lib/stores/jlu';
@@ -13,6 +14,26 @@
 	} = transfer;
 
 	let pollInterval: ReturnType<typeof setInterval>;
+
+	function getTransferDuration(sourceChain: string): number {
+		// Duration in milliseconds
+		return match(sourceChain)
+			.with('Base', () => 20 * 60 * 1000) // 20 minutes
+			.otherwise(() => 30 * 1000); // 30 seconds
+	}
+
+	function getTransferEta(transfer: Transfer): string {
+		const startTime = dayjs(
+			(transfer.initialized?.NearReceipt?.block_timestamp_seconds ??
+				transfer.initialized?.EVMLog?.block_timestamp_seconds ??
+				transfer.initialized?.Solana?.block_timestamp_seconds ??
+				Date.now() / 1000) * 1000
+		);
+		const duration = getTransferDuration(transfer.id.origin_chain);
+		return startTime.add(duration, 'millisecond').format('h:mm A');
+	}
+
+	$: estimatedCompletion = getTransferEta(transfer);
 
 	const formattedAmount = match(transfer.id.origin_chain)
 		.with('Near', () => new FixedNumber(String(amount), 18))
@@ -62,7 +83,12 @@
 	}
 
 	async function pollStatus() {
-		const api = new OmniBridgeAPI();
+		const api = new OmniBridgeAPI({
+			baseUrl:
+				import.meta.env.VITE_NETWORK_ID === 'mainnet'
+					? 'https://mainnet.api.bridge.nearone.org'
+					: 'https://testnet.api.bridge.nearone.org'
+		});
 		try {
 			const updatedTransfer = await api.getTransfer(
 				transfer.id.origin_chain,
@@ -85,14 +111,14 @@
 
 	onMount(() => {
 		// Start polling
-		pollInterval = setInterval(pollStatus, 5000);
+		pollInterval = setInterval(pollStatus, 5_000);
 		pollStatus(); // Initial check
-	});
 
-	onDestroy(() => {
-		if (pollInterval) {
-			clearInterval(pollInterval);
-		}
+		return () => {
+			if (pollInterval) {
+				clearInterval(pollInterval);
+			}
+		};
 	});
 </script>
 
@@ -122,7 +148,10 @@
 				<span class="text-green-500">Transfer completed</span>
 			{:else}
 				<div class="i-mdi:loading animate-spin text-purple-200/70 text-xl" />
-				<span class="text-purple-200/70">Transfer in progress...</span>
+				<div class="flex flex-col items-end">
+					<span class="text-purple-200/70">Transfer in progress...</span>
+					<span class="text-xs text-purple-200/50">Est. completion: {estimatedCompletion}</span>
+				</div>
 			{/if}
 		</div>
 	</div>
