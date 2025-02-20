@@ -19,7 +19,7 @@
 	import { showToast } from '$lib/components/Toast.svelte';
 	import TokenInput from '$lib/components/TokenInput.svelte';
 	import TransferStatus from '$lib/components/TransferStatus.svelte';
-	import { evmWallet$, config, switchToBase } from '$lib/evm/wallet';
+	import { evmWallet$, config, switchToChain } from '$lib/evm/wallet';
 	import { nearWallet } from '$lib/near';
 	import { solanaWallet } from '$lib/solana/wallet';
 	import { jluBalance$, updateJluBalance } from '$lib/stores/jlu';
@@ -229,7 +229,7 @@
 					import.meta.env.VITE_NETWORK_ID === 'mainnet' ? base.id : baseSepolia.id;
 				if ($evmWallet$.chainId !== targetChainId) {
 					try {
-						await switchToBase();
+						await switchToChain(targetChainId);
 					} catch (error) {
 						console.error('Failed to switch network:', error);
 						showToast({
