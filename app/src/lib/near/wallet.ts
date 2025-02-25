@@ -100,7 +100,6 @@ export class Wallet {
 					import('@near-wallet-selector/my-near-wallet'),
 					import('@near-wallet-selector/wallet-connect'),
 					import('@near-wallet-selector/ethereum-wallets'),
-					import('@web3modal/wagmi'),
 					import('@keypom/one-click-connect')
 				]).then(
 					([
@@ -113,7 +112,6 @@ export class Wallet {
 						{ setupMyNearWallet },
 						{ setupWalletConnect },
 						{ setupEthereumWallets },
-						{ createWeb3Modal },
 						{ setupOneClickConnect }
 					]) => {
 						this.isLoading$.set(false);
@@ -146,12 +144,7 @@ export class Wallet {
 								}),
 								setupEthereumWallets({
 									// eslint-disable-next-line @typescript-eslint/no-explicit-any
-									wagmiConfig: wagmiConfig as any,
-									web3Modal: createWeb3Modal({
-										wagmiConfig,
-										projectId: import.meta.env.VITE_WC_PROJECT_ID
-										// eslint-disable-next-line @typescript-eslint/no-explicit-any
-									}) as any
+									wagmiConfig: wagmiConfig as any
 								}),
 								setupOneClickConnect({
 									contractId: import.meta.env.VITE_CONTRACT_ID,
