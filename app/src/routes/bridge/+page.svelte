@@ -483,7 +483,17 @@
 	<div class="flex flex-col gap-6">
 		<div class="flex flex-col items-center gap-3">
 			<h1 class="text-4xl font-bold text-purple-100">Bridge JLU</h1>
-			<p class="text-lg text-purple-200/70">Transfer your JLU tokens between networks</p>
+			<p class="text-lg text-purple-200/70 text-center">
+				Transfer your JLU tokens between networks. For other tokens, visit
+				<a
+					href="https://app.shitzuapes.xyz/bridge"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-purple-300 hover:text-purple-200 transition-colors"
+				>
+					OmniBridge
+				</a>
+			</p>
 		</div>
 
 		<div class="flex flex-col gap-5 bg-purple-900/20 rounded-xl p-5">
