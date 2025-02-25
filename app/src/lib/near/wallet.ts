@@ -7,7 +7,7 @@ import type {
 	ModuleState,
 	Wallet as NearWallet
 } from '@near-wallet-selector/core';
-import { injected, walletConnect } from '@wagmi/connectors';
+import { injected, walletConnect } from '@tarnadas/wagmi-connectors';
 import { createConfig, http } from '@wagmi/core';
 import type { SvelteComponent } from 'svelte';
 import { derived, get, readable, writable } from 'svelte/store';
