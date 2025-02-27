@@ -11,5 +11,8 @@ export default defineConfig({
 		}),
 		sveltekit(),
 		nodePolyfills()
-	]
+	],
+	worker: {
+		format: 'es'
+	}
 });
