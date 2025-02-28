@@ -62,7 +62,7 @@ export class Knowledge extends DurableObject {
 				const searchParams = new URLSearchParams();
 				searchParams.set(
 					'query',
-					'(from:NEARWEEK OR from:NEARProtocol OR from:shitzuonnear OR from:memedotcooking OR from:NEARQuant) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -af -"#1" -reminder lang:en'
+					'(from:NEARWEEK OR from:NEARProtocol OR from:shitzuonnear OR from:memedotcooking OR from:NEARQuant OR from:NEARdevs OR from:near_ai OR from:NEARDevHub OR from:nearhorizon) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -af -"#1" -reminder lang:en'
 				);
 				searchParams.set('expansions', 'author_id,referenced_tweets.id');
 				searchParams.set('tweet.fields', 'note_tweet,referenced_tweets,created_at');
