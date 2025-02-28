@@ -1,5 +1,6 @@
 import { type Scraper } from 'agent-twitter-client-cf-workers';
 import { Hono, type Env } from 'hono';
+import { ContentfulStatusCode } from 'hono/utils/http-status';
 
 import type { EnvBindings } from '../types';
 
@@ -14,7 +15,7 @@ export const tweet = new Hono<Env>()
 
 		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/history'));
 		if (!response.ok) {
-			return c.text('', { status: response.status });
+			return c.text('', response.status as ContentfulStatusCode);
 		}
 
 		const result = await response.json<Tweet>();
@@ -26,7 +27,7 @@ export const tweet = new Hono<Env>()
 
 		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/current'));
 		if (!response.ok) {
-			return c.text('', { status: response.status });
+			return c.text('', response.status as ContentfulStatusCode);
 		}
 
 		const result = await response.json<Tweet>();
@@ -38,7 +39,7 @@ export const tweet = new Hono<Env>()
 
 		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/next'));
 		if (!response.ok) {
-			return c.text('', { status: response.status });
+			return c.text('', response.status as ContentfulStatusCode);
 		}
 
 		const result = await response.json<Tweet>();
@@ -50,7 +51,7 @@ export const tweet = new Hono<Env>()
 
 		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/schedule'));
 		if (!response.ok) {
-			return c.text('', { status: response.status });
+			return c.text('', response.status as ContentfulStatusCode);
 		}
 
 		const result = await response.json<Tweet>();
@@ -62,7 +63,7 @@ export const tweet = new Hono<Env>()
 
 		const response = await tweetsDo.fetch(new Request('https://api.juicylucy.ai/next-location'));
 		if (!response.ok) {
-			return c.text('', { status: response.status });
+			return c.text('', response.status as ContentfulStatusCode);
 		}
 
 		const result = await response.json<Tweet>();
@@ -70,14 +71,14 @@ export const tweet = new Hono<Env>()
 	})
 	.delete('/current', async (c) => {
 		if (c.req.header('Authorization') !== `Bearer ${c.env.TWITTER_BEARER_TOKEN}`) {
-			return c.text('Unauthorized', { status: 401 });
+			return c.text('Unauthorized', 401);
 		}
 
 		const tweets = c.env.TWEETS.idFromName('tweets');
 		const tweetsDo = c.env.TWEETS.get(tweets);
 
 		await tweetsDo.fetch(new Request('https://api.juicylucy.ai/current', { method: 'DELETE' }));
-		return c.text('', { status: 204 });
+		return new Response(null, { status: 204 });
 	});
 
 export async function scheduleTweet(env: EnvBindings, ctx: ExecutionContext) {
@@ -111,7 +112,7 @@ export async function searchEthDenverTweets(env: EnvBindings, ctx: ExecutionCont
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);
 
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/ethDenver')));
+	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/scrape/ethDenver')));
 }
 
 export async function searchSimpsTweets(env: EnvBindings, ctx: ExecutionContext) {

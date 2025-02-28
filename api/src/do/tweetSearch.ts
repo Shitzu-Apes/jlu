@@ -125,7 +125,7 @@ const Queries: Record<
 	}
 };
 
-const blacklistedUsers = ['Abstract_Freaks'];
+const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH'];
 
 type Scrape = 'lucy';
 
