@@ -3,6 +3,7 @@ import { DurableObject } from 'cloudflare:workers';
 import dayjs from 'dayjs';
 import { Hono, type Env } from 'hono';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import { match } from 'ts-pattern';
 import { z } from 'zod';
 
 import type { EnvBindings } from '../../types';
@@ -64,7 +65,7 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-type Query = 'ai_agents' | 'near' | 'simps' | 'ethDenver';
+type Query = 'ai_agents' | 'near' | 'ethDenver';
 
 const Queries: Record<
 	Query,
@@ -111,39 +112,61 @@ const Queries: Record<
 		minFollowers: 25,
 		minListedCount: 0,
 		useCursor: false
-	},
-	simps: {
-		query:
-			'(from:cecilia_hsueh OR from:0xFigen OR from:angelinooor OR from:x_cryptonat OR from:Hannahughes_ OR from:summerxiris OR from:jademilady4 OR from:Deviled_meggs_ OR from:Belly0x OR from:theblondebroker OR from:dogecoin_empire OR from:melarin_the OR from:tima_malla) has:media -is:reply -is:retweet lang:en',
-		pullThread: false,
-		maxResults: 10,
-		minImpressions: 0,
-		checkAuthor: false,
-		minFollowers: 0,
-		minListedCount: 0,
-		useCursor: false
 	}
 };
 
 const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH'];
 
-type Scrape = 'lucy';
+type Scrape = 'lucy' | 'simps';
 
-const Scrapes: Record<Scrape, { query: string; maxResults: number }> = {
-	lucy: { query: '@SimpsForLucy', maxResults: 5 }
+const Scrapes: Record<
+	Scrape,
+	| { type: 'search'; query: string; maxResults: number }
+	| {
+			type: 'user';
+			user_ids: string[];
+			maxResults: number;
+			isReply: boolean;
+			isRetweet: boolean;
+			hasMedia: boolean;
+	  }
+> = {
+	lucy: { type: 'search', query: '@SimpsForLucy', maxResults: 5 },
+	simps: {
+		type: 'user',
+		user_ids: [
+			'1192644966343823360', //'cecilia_hsueh',
+			'1628431584905814016', // '0xFigen',
+			'1517060285844320256', // 'angelinooor',
+			'1394152977955311624', // 'x_cryptonat',
+			'1856976546', // 'Hannahughes_',
+			'4571070557', // 'summerxiris',
+			'1542564624570236928', // 'jademilady4',
+			'1266923223406518274', // 'Deviled_meggs_',
+			'1582304621426769921', // 'Belly0x',
+			'1346148264115056641', // 'theblondebroker',
+			'1175518965713580035', // 'dogecoin_empire',
+			'1498590272443363328', // 'melarin_the',
+			'1561002226562531329' // 'tima_malla'
+		],
+		maxResults: 5,
+		isReply: false,
+		isRetweet: false,
+		hasMedia: true
+	}
 };
 
 export class TweetSearch extends DurableObject {
 	private hono: Hono<Env>;
 	private tweets: EngageableTweet[] = [];
 	private scrapeCursors: Record<Scrape, string | null> = {
-		lucy: null
+		lucy: null,
+		simps: null
 	};
 
 	private queryCursors: Record<Query, string | null> = {
 		ai_agents: null,
 		near: null,
-		simps: null,
 		ethDenver: null
 	};
 
@@ -182,12 +205,12 @@ export class TweetSearch extends DurableObject {
 			}
 
 			this.scrapeCursors = (await this.state.storage.get('scrapeCursors')) ?? {
-				lucy: null
+				lucy: null,
+				simps: null
 			};
 			this.queryCursors = (await this.state.storage.get('queryCursors')) ?? {
 				ai_agents: null,
 				near: null,
-				simps: null,
 				ethDenver: null
 			};
 		});
@@ -212,14 +235,43 @@ export class TweetSearch extends DurableObject {
 					console.log('[scrape]', Scrapes[scrape]);
 
 					const scraper = await getScraper(this.env);
-					const tweets = await scraper.searchTweets(
-						Scrapes[scrape].query,
-						Scrapes[scrape].maxResults,
-						SearchMode.Latest
-					);
+					const tweets = await match(Scrapes[scrape])
+						.with({ type: 'search' }, ({ query, maxResults }) => {
+							const searchTweets = scraper.searchTweets(query, maxResults, SearchMode.Latest);
+							return scraper.getTweetsWhere(searchTweets, {});
+						})
+						.with(
+							{ type: 'user' },
+							async ({ user_ids, maxResults, isReply, isRetweet, hasMedia }) => {
+								const tweets = [];
+								for (const user_id of user_ids) {
+									const userTweets = scraper.getTweetsByUserId(user_id, maxResults);
+									const filteredTweets = await scraper.getTweetsWhere(userTweets, {
+										isReply,
+										isRetweet
+									});
+									tweets.push(
+										...filteredTweets.filter((tweet) => {
+											if (
+												!tweet.id ||
+												BigInt(tweet.id) <= BigInt(this.scrapeCursors[scrape] ?? '0')
+											) {
+												return false;
+											}
+											return hasMedia
+												? tweet.photos?.length > 0
+												: (tweet.photos?.length ?? 0) === 0;
+										})
+									);
+								}
+								return tweets;
+							}
+						)
+						.exhaustive();
+					tweets.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
 
 					let newTweets = false;
-					for await (const tweet of tweets) {
+					for (const tweet of tweets) {
 						if (
 							tweet.id == null ||
 							tweet.username == null ||

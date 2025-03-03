@@ -112,14 +112,14 @@ export async function searchEthDenverTweets(env: EnvBindings, ctx: ExecutionCont
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);
 
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/scrape/ethDenver')));
+	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/ethDenver')));
 }
 
 export async function searchSimpsTweets(env: EnvBindings, ctx: ExecutionContext) {
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);
 
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/simps')));
+	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/scrape/simps')));
 }
 
 export async function processReplies(env: EnvBindings, ctx: ExecutionContext) {

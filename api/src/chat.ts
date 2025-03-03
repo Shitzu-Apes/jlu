@@ -2,6 +2,7 @@ import { Action, actionCreators } from '@near-js/transactions';
 import { DurableObject } from 'cloudflare:workers';
 import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
+import { ContentfulStatusCode } from 'hono/utils/http-status';
 import { connect, utils } from 'near-api-js';
 import { InMemoryKeyStore } from 'near-api-js/lib/key_stores';
 import type { KeyPairString } from 'near-api-js/lib/utils';
@@ -478,7 +479,7 @@ export const chat = new Hono<Env>()
 		// Get current conversation
 		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin);
 		if (!response.ok) {
-			return c.text('Failed to get conversation', { status: response.status });
+			return c.text('Failed to get conversation', response.status as ContentfulStatusCode);
 		}
 
 		const result = await response.json<FlirtBattleResponse>();
@@ -493,7 +494,7 @@ export const chat = new Hono<Env>()
 		// Get conversation history
 		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin + '/history');
 		if (!response.ok) {
-			return c.text('Failed to get history', { status: response.status });
+			return c.text('Failed to get history', response.status as ContentfulStatusCode);
 		}
 
 		const result = (await response.json()) as { history: Conversation[] };
@@ -514,7 +515,7 @@ export const chat = new Hono<Env>()
 		// Get current conversation
 		const response = await flirtBattleDO.fetch(new URL(c.req.url).origin);
 		if (!response.ok) {
-			return c.text('Failed to get conversation', { status: response.status });
+			return c.text('Failed to get conversation', response.status as ContentfulStatusCode);
 		}
 
 		if (!walletAddress.match(/^[a-z0-9-_.]+[a-z0-9]$/)) {
@@ -562,7 +563,7 @@ export const chat = new Hono<Env>()
 		});
 
 		if (!claimResponse.ok) {
-			return c.text('Failed to claim points', { status: claimResponse.status });
+			return c.text('Failed to claim points', claimResponse.status as ContentfulStatusCode);
 		}
 
 		await sendJLU(walletAddress, points, c);
