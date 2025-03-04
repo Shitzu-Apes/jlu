@@ -115,7 +115,7 @@ const Queries: Record<
 	}
 };
 
-const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH'];
+const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH', 'Limbo_ai', 'seraphagent', 'Xenopus_v1'];
 
 type Scrape = 'lucy' | 'simps';
 
