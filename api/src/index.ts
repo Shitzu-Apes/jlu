@@ -15,16 +15,7 @@ import { chat } from './chat';
 import { knowledge, updateNearKnowledge } from './knowledge';
 import { memory } from './memory';
 import { getLucySession } from './session';
-import {
-	processReplies,
-	scheduleTweet,
-	searchAiAgentsTweets,
-	scrapeLucy,
-	searchNearTweets,
-	searchSimpsTweets,
-	tweet,
-	searchEthDenverTweets
-} from './tweet';
+import { processReplies, scheduleTweet, handleTweetOperation, tweet } from './tweet';
 
 // eslint-disable-next-line import/no-named-as-default-member
 dayjs.extend(duration);
@@ -101,22 +92,31 @@ export default {
 				ctx.waitUntil(Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]));
 				break;
 			case '*/3 * * * *':
-				ctx.waitUntil(scrapeLucy(env, ctx));
+				ctx.waitUntil(handleTweetOperation('scrape', 'lucy', env, ctx));
 				break;
 			case '15 * * * *':
-				ctx.waitUntil(searchAiAgentsTweets(env, ctx));
+				ctx.waitUntil(handleTweetOperation('scrape', 'ai_agents', env, ctx));
 				break;
-			case '40 * * * *':
-				ctx.waitUntil(searchNearTweets(env, ctx));
+			case '20 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'keywords', env, ctx));
 				break;
-			case '45 * * * *':
-				ctx.waitUntil(searchEthDenverTweets(env, ctx));
-				break;
-			case '50 * * * *':
-				ctx.waitUntil(searchSimpsTweets(env, ctx));
+			case '25 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'events', env, ctx));
 				break;
 			case '30 * * * *':
 				ctx.waitUntil(updateNearKnowledge(env, ctx));
+				break;
+			case '35 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'grok0', env, ctx));
+				break;
+			case '37 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'grok1', env, ctx));
+				break;
+			case '40 * * * *':
+				ctx.waitUntil(handleTweetOperation('search', 'near', env, ctx));
+				break;
+			case '50 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'simps', env, ctx));
 				break;
 		}
 	}

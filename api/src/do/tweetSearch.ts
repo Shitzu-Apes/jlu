@@ -65,7 +65,7 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
-type Query = 'ai_agents' | 'near' | 'ethDenver';
+type Query = 'near';
 
 const Queries: Record<
 	Query,
@@ -80,31 +80,9 @@ const Queries: Record<
 		useCursor: boolean;
 	}
 > = {
-	ai_agents: {
-		query:
-			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -has:links -is:reply -is:retweet -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts is:verified lang:en',
-		pullThread: true,
-		maxResults: 10,
-		minImpressions: 25,
-		checkAuthor: true,
-		minFollowers: 50,
-		minListedCount: 5,
-		useCursor: false
-	},
 	near: {
 		query:
 			'("near protocol" OR "near blockchain" OR "near ai" OR "near web3" OR "near agent" OR "near wallet" OR "near sharding" OR "near upgrade" OR "near intents" OR "near decentralized" OR "near dapps" OR "near ecosystem" OR "near shitzu" OR nearprotocol OR "near da") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
-		pullThread: true,
-		maxResults: 10,
-		minImpressions: 10,
-		checkAuthor: true,
-		minFollowers: 25,
-		minListedCount: 0,
-		useCursor: false
-	},
-	ethDenver: {
-		query:
-			'("eth denver" OR "eth conference") -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -is:reply -is:retweet -giveaway -shill -pump -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing lang:en',
 		pullThread: true,
 		maxResults: 10,
 		minImpressions: 10,
@@ -117,7 +95,11 @@ const Queries: Record<
 
 const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH', 'Limbo_ai', 'seraphagent', 'Xenopus_v1'];
 
-type Scrape = 'lucy' | 'grok0' | 'grok1' | 'simps';
+type Scrape = 'lucy' | 'grok0' | 'grok1' | 'simps' | 'ai_agents' | 'keywords' | 'events';
+
+const fixQuery = (query: string) => {
+	return query.replace(/"/g, '%22');
+};
 
 const Scrapes: Record<
 	Scrape,
@@ -134,15 +116,17 @@ const Scrapes: Record<
 	lucy: { type: 'search', query: '@SimpsForLucy', maxResults: 5 },
 	grok0: {
 		type: 'search',
-		query:
-			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet',
+		query: fixQuery(
+			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet'
+		),
 		maxResults: 20
 	},
 	grok1: {
 		type: 'search',
-		query:
-			'"new blockchain project" OR "underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" min_faves:25 min_retweets:12 -is:retweet',
-		maxResults: 20
+		query: fixQuery(
+			'"underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+		),
+		maxResults: 10
 	},
 	simps: {
 		type: 'user',
@@ -165,6 +149,27 @@ const Scrapes: Record<
 		isReply: false,
 		isRetweet: false,
 		hasMedia: true
+	},
+	ai_agents: {
+		type: 'search',
+		query: fixQuery(
+			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+		),
+		maxResults: 10
+	},
+	keywords: {
+		type: 'search',
+		query: fixQuery(
+			'"defi" OR "defai" OR "mcp" OR "chain agnostic" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+		),
+		maxResults: 10
+	},
+	events: {
+		type: 'search',
+		query: fixQuery(
+			'"white house crypto" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+		),
+		maxResults: 10
 	}
 };
 
@@ -175,13 +180,14 @@ export class TweetSearch extends DurableObject {
 		lucy: null,
 		grok0: null,
 		grok1: null,
-		simps: null
+		simps: null,
+		ai_agents: null,
+		keywords: null,
+		events: null
 	};
 
 	private queryCursors: Record<Query, string | null> = {
-		ai_agents: null,
-		near: null,
-		ethDenver: null
+		near: null
 	};
 
 	constructor(
@@ -222,12 +228,13 @@ export class TweetSearch extends DurableObject {
 				lucy: null,
 				grok0: null,
 				grok1: null,
-				simps: null
+				simps: null,
+				ai_agents: null,
+				keywords: null,
+				events: null
 			};
 			this.queryCursors = (await this.state.storage.get('queryCursors')) ?? {
-				ai_agents: null,
-				near: null,
-				ethDenver: null
+				near: null
 			};
 		});
 
@@ -248,7 +255,7 @@ export class TweetSearch extends DurableObject {
 					if (!Scrapes[scrape]) {
 						return c.json({ error: 'Invalid scrape' }, 400);
 					}
-					console.log('[scrape]', Scrapes[scrape]);
+					console.log('[scrape]', JSON.stringify(Scrapes[scrape], null, 2));
 
 					const scraper = await getScraper(this.env);
 					const tweets = await match(Scrapes[scrape])
@@ -285,6 +292,7 @@ export class TweetSearch extends DurableObject {
 						)
 						.exhaustive();
 					tweets.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+					console.log('[tweets]', JSON.stringify(tweets, null, 2));
 
 					let newTweets = false;
 					for (const tweet of tweets) {

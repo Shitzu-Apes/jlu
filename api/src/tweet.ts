@@ -87,45 +87,29 @@ export async function scheduleTweet(env: EnvBindings, ctx: ExecutionContext) {
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/schedule')));
 }
 
-export async function scrapeLucy(env: EnvBindings, ctx: ExecutionContext) {
+/**
+ * Helper function to handle all scrape and search operations
+ * @param type The type of operation: 'scrape' or 'search'
+ * @param endpoint The specific endpoint to call
+ * @param env The environment bindings
+ * @param ctx The execution context
+ */
+export async function handleTweetOperation(
+	type: 'scrape' | 'search',
+	endpoint: string,
+	env: EnvBindings,
+	ctx: ExecutionContext
+) {
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);
-
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/scrape/lucy')));
-}
-
-export async function searchAiAgentsTweets(env: EnvBindings, ctx: ExecutionContext) {
-	const tweets = env.TWEET_SEARCH.idFromName('tweets');
-	const tweetsDo = env.TWEET_SEARCH.get(tweets);
-
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/ai_agents')));
-}
-
-export async function searchNearTweets(env: EnvBindings, ctx: ExecutionContext) {
-	const tweets = env.TWEET_SEARCH.idFromName('tweets');
-	const tweetsDo = env.TWEET_SEARCH.get(tweets);
-
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/near')));
-}
-
-export async function searchEthDenverTweets(env: EnvBindings, ctx: ExecutionContext) {
-	const tweets = env.TWEET_SEARCH.idFromName('tweets');
-	const tweetsDo = env.TWEET_SEARCH.get(tweets);
-
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/search/ethDenver')));
-}
-
-export async function searchSimpsTweets(env: EnvBindings, ctx: ExecutionContext) {
-	const tweets = env.TWEET_SEARCH.idFromName('tweets');
-	const tweetsDo = env.TWEET_SEARCH.get(tweets);
-
-	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/scrape/simps')));
+	ctx.waitUntil(tweetsDo.fetch(new Request(`https://api.juicylucy.ai/${type}/${endpoint}`)));
 }
 
 export async function processReplies(env: EnvBindings, ctx: ExecutionContext) {
+	// The replies endpoint doesn't follow the scrape/search pattern
+	// so we handle it separately
 	const tweets = env.TWEET_SEARCH.idFromName('tweets');
 	const tweetsDo = env.TWEET_SEARCH.get(tweets);
-
 	ctx.waitUntil(tweetsDo.fetch(new Request('https://api.juicylucy.ai/replies')));
 }
 
