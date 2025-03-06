@@ -117,7 +117,7 @@ const Queries: Record<
 
 const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH', 'Limbo_ai', 'seraphagent', 'Xenopus_v1'];
 
-type Scrape = 'lucy' | 'simps';
+type Scrape = 'lucy' | 'grok0' | 'grok1' | 'simps';
 
 const Scrapes: Record<
 	Scrape,
@@ -132,6 +132,18 @@ const Scrapes: Record<
 	  }
 > = {
 	lucy: { type: 'search', query: '@SimpsForLucy', maxResults: 5 },
+	grok0: {
+		type: 'search',
+		query:
+			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet',
+		maxResults: 20
+	},
+	grok1: {
+		type: 'search',
+		query:
+			'"new blockchain project" OR "underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" min_faves:25 min_retweets:12 -is:retweet',
+		maxResults: 20
+	},
 	simps: {
 		type: 'user',
 		user_ids: [
@@ -161,6 +173,8 @@ export class TweetSearch extends DurableObject {
 	private tweets: EngageableTweet[] = [];
 	private scrapeCursors: Record<Scrape, string | null> = {
 		lucy: null,
+		grok0: null,
+		grok1: null,
 		simps: null
 	};
 
@@ -206,6 +220,8 @@ export class TweetSearch extends DurableObject {
 
 			this.scrapeCursors = (await this.state.storage.get('scrapeCursors')) ?? {
 				lucy: null,
+				grok0: null,
+				grok1: null,
 				simps: null
 			};
 			this.queryCursors = (await this.state.storage.get('queryCursors')) ?? {
