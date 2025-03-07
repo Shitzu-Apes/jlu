@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Context, Env } from 'hono';
 import { Hono } from 'hono';
+import { ContentfulStatusCode } from 'hono/utils/http-status';
 
 import { handleTokenResponse, type Auth } from './auth';
 
@@ -66,7 +67,7 @@ export class Session extends DurableObject {
 		this.hono
 			.get('*', (c) => {
 				if (this.auth == null) {
-					return c.text('', { status: 404 });
+					return c.text('', 404 as ContentfulStatusCode);
 				}
 				return c.json(this.auth);
 			})
@@ -75,14 +76,14 @@ export class Session extends DurableObject {
 				console.log('[auth]', this.auth);
 
 				await this.storage.put('auth', this.auth);
-				return c.text('', { status: 204 });
+				return new Response(null, { status: 204 });
 			})
-			.delete('*', async (c) => {
+			.delete('*', async () => {
 				// Clear both the in-memory and stored auth
 				this.auth = undefined;
 				await this.storage.delete('auth');
 				console.log('[auth] Session cleared');
-				return c.text('', { status: 204 });
+				return new Response(null, { status: 204 });
 			});
 	}
 

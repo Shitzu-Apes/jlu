@@ -119,14 +119,14 @@ const Scrapes: Record<
 		query: fixQuery(
 			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet'
 		),
-		maxResults: 20
+		maxResults: 5
 	},
 	grok1: {
 		type: 'search',
 		query: fixQuery(
-			'"underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+			'"underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 10
+		maxResults: 5
 	},
 	simps: {
 		type: 'user',
@@ -153,23 +153,23 @@ const Scrapes: Record<
 	ai_agents: {
 		type: 'search',
 		query: fixQuery(
-			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 10
+		maxResults: 5
 	},
 	keywords: {
 		type: 'search',
 		query: fixQuery(
-			'"defi" OR "defai" OR "mcp" OR "chain agnostic" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+			'"defi" OR "defai" OR "mpc" OR "chain agnostic" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 10
+		maxResults: 5
 	},
 	events: {
 		type: 'search',
 		query: fixQuery(
-			'"white house crypto" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:5 min_retweets:1 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
+			'"white house crypto" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 10
+		maxResults: 5
 	}
 };
 
@@ -699,31 +699,30 @@ export class TweetSearch extends DurableObject {
 							await storeTweets();
 							console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
 							console.log('[tweet.imageUrl]', tweet.imageUrl);
+						} else {
+							console.log('[generating image]');
+							const res = await generateImage(
+								`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
+								this.env
+							);
+							if (!res.ok) {
+								console.error('Failed to generate image', res.status, await res.text());
+								return c.json({ error: 'Failed to generate image' }, 500);
+							}
+							const {
+								sdGenerationJob: { generationId }
+							} = await res.json<{ sdGenerationJob: { generationId: string } }>();
+							if (!generationId) {
+								console.error('Failed to generate image', res.status, await res.text());
+								return c.json({ error: 'Failed to generate image' }, 500);
+							}
+
+							tweet.imageGenerationId = generationId;
+							await storeTweets();
+							console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
+
 							return new Response(null, { status: 204 });
 						}
-
-						console.log('[generating image]');
-						const res = await generateImage(
-							`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
-							this.env
-						);
-						if (!res.ok) {
-							console.error('Failed to generate image', res.status, await res.text());
-							return c.json({ error: 'Failed to generate image' }, 500);
-						}
-						const {
-							sdGenerationJob: { generationId }
-						} = await res.json<{ sdGenerationJob: { generationId: string } }>();
-						if (!generationId) {
-							console.error('Failed to generate image', res.status, await res.text());
-							return c.json({ error: 'Failed to generate image' }, 500);
-						}
-
-						tweet.imageGenerationId = generationId;
-						await storeTweets();
-						console.log('[tweet.imageGenerationId]', tweet.imageGenerationId);
-
-						return new Response(null, { status: 204 });
 					}
 
 					if (tweet.imageUrl == null) {
