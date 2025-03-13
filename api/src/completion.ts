@@ -146,7 +146,24 @@ export async function chatCompletion<
 		// )
 		.exhaustive();
 	if (!response.ok) {
-		const text = await response.text();
+		const text = await response.json<{ param?: 'quota' }>();
+		if (text.param === 'quota') {
+			const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+			const response = await openai.beta.chat.completions.parse({
+				model: 'gpt-4o-mini',
+				messages,
+				response_format: zodResponseFormat(zodObject, 'json_object')
+			});
+			const parsedObject = zodObject.safeParse(
+				response.choices[0].message.parsed
+			) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
+
+			return {
+				status: 'success' as const,
+				parsedObject,
+				rawResponse: response.choices[0].message.content
+			};
+		}
 		console.error('[completion error]', text);
 		return { status: 'error' as const, errorMessage: text } as const;
 	}
