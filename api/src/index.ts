@@ -100,20 +100,20 @@ export default {
 			case '20 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'keywords', env, ctx));
 				break;
-			case '25 * * * *':
-				ctx.waitUntil(handleTweetOperation('scrape', 'events', env, ctx));
-				break;
+			// case '25 * * * *':
+			// 	ctx.waitUntil(handleTweetOperation('scrape', 'events', env, ctx));
+			// 	break;
 			case '30 * * * *':
 				ctx.waitUntil(updateNearKnowledge(env, ctx));
 				break;
 			case '35 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'grok0', env, ctx));
 				break;
-			case '37 * * * *':
-				ctx.waitUntil(handleTweetOperation('scrape', 'grok1', env, ctx));
-				break;
 			case '40 * * * *':
 				ctx.waitUntil(handleTweetOperation('search', 'near', env, ctx));
+				break;
+			case '45 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'grok1', env, ctx));
 				break;
 			case '50 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'simps', env, ctx));

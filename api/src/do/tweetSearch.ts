@@ -93,7 +93,15 @@ const Queries: Record<
 	}
 };
 
-const blacklistedUsers = ['Abstract_Freaks', 'Ava_AITECH', 'Limbo_ai', 'seraphagent', 'Xenopus_v1'];
+const blacklistedUsers = [
+	'Abstract_Freaks',
+	'Ava_AITECH',
+	'Limbo_ai',
+	'seraphagent',
+	'Xenopus_v1',
+	'Comet_AI_Agent',
+	'itsanita_ai'
+];
 
 type Scrape = 'lucy' | 'grok0' | 'grok1' | 'simps' | 'ai_agents' | 'keywords' | 'events';
 
@@ -103,7 +111,14 @@ const fixQuery = (query: string) => {
 
 const Scrapes: Record<
 	Scrape,
-	| { type: 'search'; query: string; maxResults: number }
+	| {
+			type: 'search';
+			query: string;
+			maxResults: number;
+			checkAuthor: boolean;
+			minFollowers: number;
+			minListedCount: number;
+	  }
 	| {
 			type: 'user';
 			user_ids: string[];
@@ -113,20 +128,33 @@ const Scrapes: Record<
 			hasMedia: boolean;
 	  }
 > = {
-	lucy: { type: 'search', query: '@SimpsForLucy', maxResults: 5 },
+	lucy: {
+		type: 'search',
+		query: '@SimpsForLucy',
+		maxResults: 5,
+		checkAuthor: false,
+		minFollowers: 0,
+		minListedCount: 0
+	},
 	grok0: {
 		type: 'search',
 		query: fixQuery(
 			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet'
 		),
-		maxResults: 5
+		maxResults: 10,
+		checkAuthor: false,
+		minFollowers: 0,
+		minListedCount: 0
 	},
 	grok1: {
 		type: 'search',
 		query: fixQuery(
 			'"underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5
+		maxResults: 20,
+		checkAuthor: true,
+		minFollowers: 100,
+		minListedCount: 5
 	},
 	simps: {
 		type: 'user',
@@ -155,21 +183,30 @@ const Scrapes: Record<
 		query: fixQuery(
 			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5
+		maxResults: 20,
+		checkAuthor: true,
+		minFollowers: 100,
+		minListedCount: 5
 	},
 	keywords: {
 		type: 'search',
 		query: fixQuery(
 			'"defi" OR "defai" OR "mpc" OR "chain agnostic" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5
+		maxResults: 20,
+		checkAuthor: true,
+		minFollowers: 100,
+		minListedCount: 5
 	},
 	events: {
 		type: 'search',
 		query: fixQuery(
 			'"white house crypto" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5
+		maxResults: 20,
+		checkAuthor: true,
+		minFollowers: 100,
+		minListedCount: 5
 	}
 };
 
@@ -292,7 +329,6 @@ export class TweetSearch extends DurableObject {
 						)
 						.exhaustive();
 					tweets.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-					console.log('[tweets]', JSON.stringify(tweets, null, 2));
 
 					let newTweets = false;
 					for (const tweet of tweets) {
@@ -306,7 +342,7 @@ export class TweetSearch extends DurableObject {
 							continue;
 						}
 						if (BigInt(tweet.id) <= BigInt(this.scrapeCursors[scrape] ?? '0')) {
-							break;
+							continue;
 						}
 						if (this.tweets.some((t) => t.tweet.id === tweet.id)) {
 							continue;
@@ -319,11 +355,31 @@ export class TweetSearch extends DurableObject {
 							continue;
 						}
 
+						const author = await getAuthor(tweet.userId, tweet.username, scraper, this.env);
+
+						if (Scrapes[scrape].type === 'search' && Scrapes[scrape].checkAuthor) {
+							if (author == null) {
+								continue;
+							}
+							if (
+								dayjs(author.created_at).isAfter(dayjs().subtract(3, 'months')) ||
+								author.description.includes('ads') ||
+								author.description.includes('promo') ||
+								author.description.includes('boost') ||
+								author.description.includes('sponsored') ||
+								author.public_metrics.followers_count < Scrapes[scrape].minFollowers ||
+								author.public_metrics.followers_count / author.public_metrics.following_count <
+									0.5 ||
+								author.public_metrics.listed_count < Scrapes[scrape].minListedCount
+							) {
+								continue;
+							}
+						}
+
 						let conversation: { id: string; text: string; author: string }[] = [];
 						if (tweet.inReplyToStatusId) {
 							conversation = await pullConversation(tweet.inReplyToStatusId, scraper, this.env);
 						}
-						const author = await getAuthor(tweet.userId, tweet.username, scraper, this.env);
 
 						const newTweet: EngageableTweet = {
 							tweet: {
