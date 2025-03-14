@@ -89,6 +89,7 @@ export default {
 				);
 				break;
 			case '* * * * *':
+				// ctx.waitUntil(processReplies(env, ctx));
 				ctx.waitUntil(Promise.all([scheduleTweet(env, ctx), processReplies(env, ctx)]));
 				break;
 			case '*/3 * * * *':

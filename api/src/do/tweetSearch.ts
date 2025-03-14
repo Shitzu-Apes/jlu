@@ -65,6 +65,25 @@ const LucyResponse = z.object({
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
+const TweetEvaluation = z.object({
+	should_reply: z.boolean(),
+	reason: z.string(),
+	confidence: z.number(),
+	detected_patterns: z.array(
+		z.enum([
+			'hostile',
+			'ai_hate',
+			'spam',
+			'irrelevant',
+			'trolling',
+			'dismissive',
+			'inappropriate',
+			'low_quality'
+		])
+	)
+});
+export type TweetEvaluation = z.infer<typeof TweetEvaluation>;
+
 type Query = 'near';
 
 const Queries: Record<
@@ -548,8 +567,95 @@ export class TweetSearch extends DurableObject {
 							role: 'user' as const,
 							content
 						});
+
+						// Only evaluate if there's an actual conversation happening
+						if (messages.filter((m) => m.role !== 'system').length >= 3) {
+							// First evaluate if we should reply at all
+							const evaluationMessages: ChatCompletionMessageParam[] = [
+								{
+									role: 'system',
+									content: `You are an evaluation system that determines whether Lucy should reply to a tweet. Lucy is an AI personality focused on blockchain and crypto community engagement.
+
+Lucy should reply to tweets about:
+- Blockchain projects and launches
+- Crypto trends and developments
+- Web3 technology and updates
+- Market sentiment and trading
+- Community engagement and airdrops
+- AI and blockchain integration
+
+Only skip tweets that are:
+- Explicitly hostile or hateful
+- Direct attacks on AI agents
+- Completely unrelated to crypto/blockchain
+- Duplicate spam tweets
+- Adult or inappropriate content
+
+Output a JSON response with:
+- should_reply: boolean indicating if Lucy should reply (default to true unless problematic)
+- reason: brief explanation of the decision
+- confidence: number between 0 (completely uncertain) and 1 (absolutely certain). You must return a value in this range.
+- detected_patterns: array of detected negative patterns. You can only use these patterns:
+  * 'hostile' - aggressive or hateful content
+  * 'ai_hate' - direct attacks on AI agents
+  * 'spam' - duplicate promotional tweets
+  * 'irrelevant' - unrelated to crypto/blockchain/AI
+  * 'trolling' - intentionally harmful
+  * 'dismissive' - explicitly rejecting AI
+  * 'inappropriate' - adult or offensive content
+  * 'low_quality' - incomprehensible content`
+								}
+							];
+
+							// Add conversation history to evaluation
+							evaluationMessages.push({
+								role: 'system',
+								content: 'Following is the conversation between Lucy and the user(s).'
+							});
+							for (const c of tweet.conversation ?? []) {
+								if (c.author === 'SimpsForLucy') {
+									evaluationMessages.push({ role: 'assistant', content: c.text });
+								} else {
+									evaluationMessages.push({
+										role: 'user',
+										content: `${c.author}: ${c.text}`
+									});
+								}
+							}
+							evaluationMessages.push({
+								role: 'user',
+								content
+							});
+
+							console.log('[evaluating tweet]');
+							const { status: evalStatus, parsedObject: evalParsedObject } = await chatCompletion(
+								this.env,
+								evaluationMessages,
+								'deepseek-chat',
+								TweetEvaluation
+							);
+
+							if (evalStatus === 'error' || !evalParsedObject.success) {
+								console.error('Failed to evaluate tweet');
+								this.tweets.splice(0, 1);
+								await storeTweets();
+								return new Response(null, { status: 204 });
+							}
+
+							const evaluation = evalParsedObject.data;
+							console.log('[evaluation]', JSON.stringify(evaluation, null, 2));
+
+							if (!evaluation.should_reply || evaluation.confidence > 0.7) {
+								console.log('[skipping tweet]', evaluation.reason);
+								this.tweets.splice(0, 1);
+								await storeTweets();
+								return new Response(null, { status: 204 });
+							}
+						}
+
 						const projectIds = await this.env.KV.get('projectIds');
 						if (!projectIds) {
+							console.error('No project ids found');
 							return new Response(null, { status: 500 });
 						}
 
