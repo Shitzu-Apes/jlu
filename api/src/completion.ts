@@ -90,9 +90,32 @@ export async function chatCompletion<
 	}
 	console.log('[model]', model);
 
-	// if (model === 'deepseek-chat' || model === 'deepseek-reasoner') {
-	// 	// TODO deepseek down?
-	// }
+	if (model === 'deepseek-chat' || model === 'deepseek-reasoner') {
+		// TODO deepseek not usable from CF Workers?
+		try {
+			const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+			const response = await openai.beta.chat.completions.parse({
+				model: 'gpt-4o-mini',
+				messages,
+				response_format: zodResponseFormat(zodObject, 'json_object')
+			});
+			const parsedObject = zodObject.safeParse(
+				response.choices[0].message.parsed
+			) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
+
+			return {
+				status: 'success' as const,
+				parsedObject,
+				rawResponse: ''
+			};
+		} catch (error) {
+			console.error('[fallback completion error]', error);
+			return {
+				status: 'error' as const,
+				errorMessage: 'API error'
+			};
+		}
+	}
 
 	let response: Response;
 	try {
@@ -114,25 +137,26 @@ export async function chatCompletion<
 					})
 				})
 			)
-			.with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
-				fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
-					method: 'POST',
-					headers: {
-						Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
-						'Content-Type': 'application/json',
-						'User-Agent': 'SimpsForLucy'
-					},
-					body: JSON.stringify({
-						model,
-						messages,
-						max_tokens: maxTokens,
-						temperature,
-						response_format: responseFormat
-					})
-				})
-			)
+			// .with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
+			// 	fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
+			// 		method: 'POST',
+			// 		headers: {
+			// 			Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+			// 			'Content-Type': 'application/json',
+			// 			'User-Agent': 'SimpsForLucy'
+			// 		},
+			// 		body: JSON.stringify({
+			// 			model,
+			// 			messages,
+			// 			max_tokens: maxTokens,
+			// 			temperature,
+			// 			response_format: responseFormat
+			// 		})
+			// 	})
+			// )
 			.exhaustive();
-	} catch (_) {
+	} catch (error) {
+		console.error('[completion error]', error);
 		try {
 			// fallback to gpt-4o-mini
 			const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
@@ -151,7 +175,7 @@ export async function chatCompletion<
 				rawResponse: ''
 			};
 		} catch (error) {
-			console.error('[completion error]', error);
+			console.error('[fallback completion error]', error);
 			return {
 				status: 'error' as const,
 				errorMessage: 'API error'
@@ -160,26 +184,31 @@ export async function chatCompletion<
 	}
 
 	if (!response.ok) {
-		const text = await response.json<{ param?: 'quota' }>();
-		if (text.param === 'quota') {
-			const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-			const response = await openai.beta.chat.completions.parse({
-				model: 'gpt-4o-mini',
-				messages,
-				response_format: zodResponseFormat(zodObject, 'json_object')
-			});
-			const parsedObject = zodObject.safeParse(
-				response.choices[0].message.parsed
-			) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
+		try {
+			const text = await response.json<{ param?: 'quota' }>();
+			console.log('[completion error response json]', JSON.stringify(text, null, 2));
+			if (text.param === 'quota') {
+				const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+				const response = await openai.beta.chat.completions.parse({
+					model: 'gpt-4o-mini',
+					messages,
+					response_format: zodResponseFormat(zodObject, 'json_object')
+				});
+				const parsedObject = zodObject.safeParse(
+					response.choices[0].message.parsed
+				) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
 
-			return {
-				status: 'success' as const,
-				parsedObject,
-				rawResponse: response.choices[0].message.content
-			};
+				return {
+					status: 'success' as const,
+					parsedObject,
+					rawResponse: response.choices[0].message.content
+				};
+			}
+		} catch (_) {
+			const text = await response.text();
+			console.error('[completion error response text]', text);
+			return { status: 'error' as const, errorMessage: text } as const;
 		}
-		console.error('[completion error]', text);
-		return { status: 'error' as const, errorMessage: text } as const;
 	}
 
 	const completion = await response.json<OpenAIResponse>();
