@@ -160,7 +160,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet'
 		),
-		maxResults: 10,
+		maxResults: 5,
 		checkAuthor: false,
 		minFollowers: 0,
 		minListedCount: 0
@@ -170,7 +170,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'"underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 20,
+		maxResults: 5,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -202,7 +202,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 20,
+		maxResults: 5,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -212,7 +212,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'"defi" OR "defai" OR "mpc" OR "chain agnostic" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 20,
+		maxResults: 5,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -222,7 +222,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'"white house crypto" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 20,
+		maxResults: 5,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -714,7 +714,10 @@ Output a JSON response with:
 									}
 									return `${category}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
 								})
-							)
+							).catch((err) => {
+								console.error('Failed to generate knowledge categories', err);
+								return [];
+							})
 						).join('\n\n');
 
 						const projects = (
@@ -735,7 +738,10 @@ Output a JSON response with:
 									}
 									return `${project}:\n${values.map((val) => `- ${val.text}`).join('\n')}`;
 								})
-							)
+							).catch((err) => {
+								console.error('Failed to generate knowledge categories', err);
+								return [];
+							})
 						).join('\n\n');
 
 						messages.push({

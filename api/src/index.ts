@@ -95,29 +95,29 @@ export default {
 			case '*/3 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'lucy', env, ctx));
 				break;
-			case '15 * * * *':
+			case '1/31 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'simps', env, ctx));
+				break;
+			case '5/35 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'ai_agents', env, ctx));
 				break;
-			case '20 * * * *':
+			case '10/40 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'keywords', env, ctx));
 				break;
 			// case '25 * * * *':
 			// 	ctx.waitUntil(handleTweetOperation('scrape', 'events', env, ctx));
 			// 	break;
-			case '30 * * * *':
+			case '15/45 * * * *':
 				ctx.waitUntil(updateNearKnowledge(env, ctx));
 				break;
-			case '35 * * * *':
+			case '20/50 * * * *':
 				ctx.waitUntil(handleTweetOperation('scrape', 'grok0', env, ctx));
+				break;
+			case '25/55 * * * *':
+				ctx.waitUntil(handleTweetOperation('scrape', 'grok1', env, ctx));
 				break;
 			case '40 * * * *':
 				ctx.waitUntil(handleTweetOperation('search', 'near', env, ctx));
-				break;
-			case '45 * * * *':
-				ctx.waitUntil(handleTweetOperation('scrape', 'grok1', env, ctx));
-				break;
-			case '50 * * * *':
-				ctx.waitUntil(handleTweetOperation('scrape', 'simps', env, ctx));
 				break;
 		}
 	}
