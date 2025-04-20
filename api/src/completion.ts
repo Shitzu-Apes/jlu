@@ -90,32 +90,32 @@ export async function chatCompletion<
 	}
 	console.log('[model]', model);
 
-	if (model === 'deepseek-chat' || model === 'deepseek-reasoner') {
-		// TODO deepseek not usable from CF Workers?
-		try {
-			const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-			const response = await openai.beta.chat.completions.parse({
-				model: 'gpt-4o-mini',
-				messages,
-				response_format: zodResponseFormat(zodObject, 'json_object')
-			});
-			const parsedObject = zodObject.safeParse(
-				response.choices[0].message.parsed
-			) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
+	// if (model === 'deepseek-chat' || model === 'deepseek-reasoner') {
+	// 	// TODO deepseek not usable from CF Workers?
+	// 	try {
+	// 		const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+	// 		const response = await openai.beta.chat.completions.parse({
+	// 			model: 'gpt-4o-mini',
+	// 			messages,
+	// 			response_format: zodResponseFormat(zodObject, 'json_object')
+	// 		});
+	// 		const parsedObject = zodObject.safeParse(
+	// 			response.choices[0].message.parsed
+	// 		) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
 
-			return {
-				status: 'success' as const,
-				parsedObject,
-				rawResponse: ''
-			};
-		} catch (error) {
-			console.error('[fallback completion error]', error);
-			return {
-				status: 'error' as const,
-				errorMessage: 'API error'
-			};
-		}
-	}
+	// 		return {
+	// 			status: 'success' as const,
+	// 			parsedObject,
+	// 			rawResponse: ''
+	// 		};
+	// 	} catch (error) {
+	// 		console.error('[fallback completion error]', error);
+	// 		return {
+	// 			status: 'error' as const,
+	// 			errorMessage: 'API error'
+	// 		};
+	// 	}
+	// }
 
 	let response: Response;
 	try {
@@ -137,23 +137,23 @@ export async function chatCompletion<
 					})
 				})
 			)
-			// .with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
-			// 	fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
-			// 		method: 'POST',
-			// 		headers: {
-			// 			Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
-			// 			'Content-Type': 'application/json',
-			// 			'User-Agent': 'SimpsForLucy'
-			// 		},
-			// 		body: JSON.stringify({
-			// 			model,
-			// 			messages,
-			// 			max_tokens: maxTokens,
-			// 			temperature,
-			// 			response_format: responseFormat
-			// 		})
-			// 	})
-			// )
+			.with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
+				fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+						'Content-Type': 'application/json',
+						'User-Agent': 'SimpsForLucy'
+					},
+					body: JSON.stringify({
+						model,
+						messages,
+						max_tokens: maxTokens,
+						temperature,
+						response_format: responseFormat
+					})
+				})
+			)
 			.exhaustive();
 	} catch (error) {
 		console.error('[completion error]', error);

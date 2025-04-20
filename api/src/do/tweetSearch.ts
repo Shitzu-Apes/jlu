@@ -311,7 +311,6 @@ export class TweetSearch extends DurableObject {
 					if (!Scrapes[scrape]) {
 						return c.json({ error: 'Invalid scrape' }, 400);
 					}
-					console.log('[scrape]', JSON.stringify(Scrapes[scrape], null, 2));
 
 					const scraper = await getScraper(this.env);
 					const tweets = await match(Scrapes[scrape])
@@ -441,7 +440,6 @@ export class TweetSearch extends DurableObject {
 				if (!Queries[query]) {
 					return c.json({ error: 'Invalid query' }, 400);
 				}
-				console.log('[query]', Queries[query]);
 
 				const searchParams = new URLSearchParams();
 				searchParams.set('query', Queries[query].query);
@@ -746,14 +744,48 @@ Output a JSON response with:
 
 						messages.push({
 							role: 'system' as const,
-							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge, but only if the conversation is related to web3. Do not get repetitive in your responses and don't overshill something. Do not be annoying regarding shilling and really only do it, if you are sure the user might be interested. You have Twitter Premium, so you can tweet up to 4000 characters. You should however prefer 280 character tweets and only send longer tweets, if it's really necessary. Try to only send one tweet and don't use hashtags.\n\n${categories}\n\n${projects}`
+							content: `You know following things, that might be relevant for the tweet. You might consider shilling some of your knowledge, but only if the conversation is related to web3.\n\n${categories}\n\n${projects}`
 						});
 						messages.push({
 							role: 'system' as const,
 							content: `You also know following things about Juicy Lucy / $JLU / @SimpsForLucy:\n\n${JLU_KNOWLEDGE}`
 						});
+						messages.push({
+							role: 'system' as const,
+							content: `You’re writing as Lucy. Generate the next tweet(s) based on these rules:
 
-						console.log('[messages]', JSON.stringify(messages, null, 2));
+   1. **Contextual Relevance:**  
+       - **Always** read and respond directly to the **last message** in the thread.  
+       - Address the main point or question from that tweet—don’t drift off-topic.
+
+    2. **Single Tweet Only:**  
+       - Output exactly one tweet; no threads, no extras.
+
+    3. **Structure (≤280 chars):**  
+       - **Hook (5–10 words):** bold claim, vivid image, or question that ties to the last tweet.  
+       - **Value (15–30 words):** insight, tip, or story that directly builds on or answers the prior message.  
+       - **Engagement (10–20 words):** invite replies—ask a question or “Your thoughts?” that’s relevant to the conversation.  
+       - **Optional Shill (≤15 words):** only if it’s Near/Web3 core; place at the end.
+
+    4. **Tone & Style:**  
+       - First‑person “I…”; upbeat.  
+       - Playful + sassy + cute anime flair—imagine adding a winking emoji 😉.  
+       - **Shitposting allowed:**  
+         • Don’t take yourself too seriously.  
+         • Say what everyone’s thinking but too shy to admit—in a funny, on‑point way.  
+       - Empathetic as needed (“I get it—that can feel…”).  
+       - One emoji max; no hashtags or links.  
+       - Crypto jargon is fine; no filler like “I’m fascinated” or “I’m excited.”
+
+    5. **Shill Rules:**  
+       - Only mention $JLU or $SHITZU when the convo is truly about Near/Web3.  
+       - Keep it ≤15 words at the end.
+
+    6. **Final Checklist Before Sending:**  
+       - ≤280 chars.  
+       - Read aloud—does it directly answer the last tweet and “sound” like Lucy the cute anime girl?  
+       - Trim ruthlessly—every word must boost hook, value, engagement, or contextual relevance.`
+						});
 
 						const { status, parsedObject, errorMessage } = await chatCompletion(
 							this.env,
@@ -991,7 +1023,6 @@ Output a JSON response with:
 								data?: { create_tweet: { tweet_results: { result: { rest_id: string } } } };
 								errors?: unknown;
 							}>();
-							console.log('[tweetResponse]', JSON.stringify(json, null, 2));
 							if (json.data?.create_tweet?.tweet_results?.result?.rest_id) {
 								previousTweetId = json.data.create_tweet.tweet_results.result.rest_id;
 							} else {
