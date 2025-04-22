@@ -150,7 +150,7 @@ export class Tweets extends DurableObject {
 
 						messages.push({
 							role: 'assistant',
-							content: `Here are the tweets I have posted so far:\n${history.join('\n')}`
+							content: `Here are the last tweets I have posted so far:\n${history.slice(-20).join('\n')}`
 						});
 						if (this.nextLocation != null) {
 							messages.push({

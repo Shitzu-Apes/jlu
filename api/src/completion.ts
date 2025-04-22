@@ -85,7 +85,7 @@ export async function chatCompletion<
 		(sum, msg) => (typeof msg.content === 'string' ? sum + countTokens(msg.content, model) : sum),
 		0
 	);
-	if (tokens > 8192) {
+	if (tokens > 7_000) {
 		model = 'deepseek-chat';
 	}
 	console.log('[model]', model);
@@ -188,21 +188,22 @@ export async function chatCompletion<
 			const text = await response.json<{ param?: 'quota' }>();
 			console.log('[completion error response json]', JSON.stringify(text, null, 2));
 			if (text.param === 'quota') {
-				const openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-				const response = await openai.beta.chat.completions.parse({
-					model: 'gpt-4o-mini',
-					messages,
-					response_format: zodResponseFormat(zodObject, 'json_object')
+				model = 'deepseek-chat';
+				response = await fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+						'Content-Type': 'application/json',
+						'User-Agent': 'SimpsForLucy'
+					},
+					body: JSON.stringify({
+						model,
+						messages,
+						max_tokens: maxTokens,
+						temperature,
+						response_format: responseFormat
+					})
 				});
-				const parsedObject = zodObject.safeParse(
-					response.choices[0].message.parsed
-				) as z.SafeParseReturnType<z.infer<TSchema>, z.infer<TSchema>>;
-
-				return {
-					status: 'success' as const,
-					parsedObject,
-					rawResponse: response.choices[0].message.content
-				};
 			}
 		} catch (_) {
 			const text = await response.text();

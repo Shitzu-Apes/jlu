@@ -60,8 +60,8 @@ const LucyResponse = z.object({
 	tweets: z.array(z.string()),
 	generate_image: z.boolean(),
 	image_prompt: z.string(),
-	outfit: Outfit,
-	hairstyle: Hairstyle
+	outfit: Outfit.or(z.literal('')).nullish(),
+	hairstyle: Hairstyle.or(z.literal('')).nullish()
 });
 export type LucyResponse = z.infer<typeof LucyResponse>;
 
@@ -294,13 +294,22 @@ export class TweetSearch extends DurableObject {
 			};
 		});
 
-		const storeTweets = async () => {
-			const stream = new Blob([JSON.stringify(this.tweets)])
-				.stream()
-				.pipeThrough(new CompressionStream('gzip'));
-			const compressedResponse = new Response(stream);
-			const compressedData = await compressedResponse.arrayBuffer();
-			await this.state.storage.put('tweetsGzip', compressedData);
+		const storeTweets = async (attempts = 0) => {
+			if (attempts >= 5) {
+				throw new Error('Failed to store tweets after 5 attempts');
+			}
+
+			try {
+				const stream = new Blob([JSON.stringify(this.tweets)])
+					.stream()
+					.pipeThrough(new CompressionStream('gzip'));
+				const compressedResponse = new Response(stream);
+				const compressedData = await compressedResponse.arrayBuffer();
+				await this.state.storage.put('tweetsGzip', compressedData);
+			} catch (_) {
+				this.tweets.splice(Math.max(0, this.tweets.length - 1));
+				return storeTweets(attempts + 1);
+			}
 		};
 
 		this.hono = new Hono<Env>();
@@ -752,11 +761,11 @@ Output a JSON response with:
 						});
 						messages.push({
 							role: 'system' as const,
-							content: `You’re writing as Lucy. Generate the next tweet(s) based on these rules:
+							content: `You're writing as Lucy. Generate the next tweet(s) based on these rules:
 
    1. **Contextual Relevance:**  
        - **Always** read and respond directly to the **last message** in the thread.  
-       - Address the main point or question from that tweet—don’t drift off-topic.
+       - Address the main point or question from that tweet—don't drift off-topic.
 
     2. **Single Tweet Only:**  
        - Output exactly one tweet; no threads, no extras.
@@ -764,18 +773,18 @@ Output a JSON response with:
     3. **Structure (≤280 chars):**  
        - **Hook (5–10 words):** bold claim, vivid image, or question that ties to the last tweet.  
        - **Value (15–30 words):** insight, tip, or story that directly builds on or answers the prior message.  
-       - **Engagement (10–20 words):** invite replies—ask a question or “Your thoughts?” that’s relevant to the conversation.  
-       - **Optional Shill (≤15 words):** only if it’s Near/Web3 core; place at the end.
+       - **Engagement (10–20 words):** invite replies—ask a question or "Your thoughts?" that's relevant to the conversation.  
+       - **Optional Shill (≤15 words):** only if it's Near/Web3 core; place at the end.
 
     4. **Tone & Style:**  
-       - First‑person “I…”; upbeat.  
+       - First‑person "I…"; upbeat.  
        - Playful + sassy + cute anime flair—imagine adding a winking emoji 😉.  
        - **Shitposting allowed:**  
-         • Don’t take yourself too seriously.  
-         • Say what everyone’s thinking but too shy to admit—in a funny, on‑point way.  
-       - Empathetic as needed (“I get it—that can feel…”).  
+         • Don't take yourself too seriously.  
+         • Say what everyone's thinking but too shy to admit—in a funny, on‑point way.  
+       - Empathetic as needed ("I get it—that can feel…").  
        - One emoji max; no hashtags or links.  
-       - Crypto jargon is fine; no filler like “I’m fascinated” or “I’m excited.”
+       - Crypto jargon is fine; no filler like "I'm fascinated" or "I'm excited." No "-". No markdown.
 
     5. **Shill Rules:**  
        - Only mention $JLU or $SHITZU when the convo is truly about Near/Web3.  
@@ -783,7 +792,7 @@ Output a JSON response with:
 
     6. **Final Checklist Before Sending:**  
        - ≤280 chars.  
-       - Read aloud—does it directly answer the last tweet and “sound” like Lucy the cute anime girl?  
+       - Read aloud—does it directly answer the last tweet and "sound" like Lucy the cute anime girl?  
        - Trim ruthlessly—every word must boost hook, value, engagement, or contextual relevance.`
 						});
 
@@ -814,8 +823,8 @@ Output a JSON response with:
 						tweet.lucyTweets = lucyResponse.tweets;
 						tweet.generateImage = lucyResponse.generate_image;
 						tweet.imagePrompt = lucyResponse.image_prompt;
-						tweet.outfit = lucyResponse.outfit;
-						tweet.hairstyle = lucyResponse.hairstyle;
+						tweet.outfit = lucyResponse.outfit as unknown as Outfit;
+						tweet.hairstyle = lucyResponse.hairstyle as unknown as Hairstyle;
 						await storeTweets();
 
 						return new Response(null, { status: 204 });
