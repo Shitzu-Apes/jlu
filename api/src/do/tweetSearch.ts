@@ -158,7 +158,7 @@ const Scrapes: Record<
 	grok0: {
 		type: 'search',
 		query: fixQuery(
-			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca min_faves:25 min_retweets:12 -is:retweet'
+			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca OR from:PublicAI_ min_faves:12 min_retweets:5 -is:retweet'
 		),
 		maxResults: 5,
 		checkAuthor: false,
