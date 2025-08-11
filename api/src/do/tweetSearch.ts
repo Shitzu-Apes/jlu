@@ -638,7 +638,7 @@ Output a JSON response with:
 							const { status: evalStatus, parsedObject: evalParsedObject } = await chatCompletion(
 								this.env,
 								evaluationMessages,
-								'deepseek-chat',
+								'llama-3.3-70b',
 								TweetEvaluation
 							);
 
@@ -687,7 +687,7 @@ Output a JSON response with:
 						} = await chatCompletion(
 							this.env,
 							knowledgeMessages,
-							'deepseek-chat',
+							'llama-3.3-70b',
 							z.object({
 								categories: z.array(KnowledgeCategory),
 								projects: z.array(z.string())
@@ -808,6 +808,8 @@ Output a JSON response with:
 
 						if (status === 'error' || !parsedObject.success) {
 							console.error(`[tweet] Failed to evaluate conversation: ${errorMessage}`);
+							this.tweets.splice(0, 1);
+							await storeTweets();
 							return new Response(JSON.stringify({ error: `Failed to evaluate conversation` }), {
 								status: 500
 							});

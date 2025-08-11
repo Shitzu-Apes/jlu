@@ -7,6 +7,7 @@ type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 interface EnvBindings {
 	KV: KVNamespace;
+	AI: Ai;
 	SESSION: DurableObjectNamespace<Session>;
 	FLIRTBATTLE: DurableObjectNamespace<FlirtBattle>;
 	TWEETS: DurableObjectNamespace<Tweets>;
@@ -19,6 +20,7 @@ interface EnvBindings {
 	CEREBRAS_API_KEY: string;
 	OPENAI_API_KEY: string;
 	DEEPSEEK_API_KEY: string;
+	CLOUDFLARE_API_KEY: string;
 	LEONARDO_API_KEY: string;
 	TWITTER_LUCY_USER_ID: string;
 	TWITTER_BEARER_TOKEN: string;

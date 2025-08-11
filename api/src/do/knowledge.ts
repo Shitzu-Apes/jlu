@@ -269,7 +269,7 @@ export class Knowledge extends DurableObject {
 		const { status, parsedObject, errorMessage, rawResponse } = await chatCompletion(
 			this.env,
 			messages,
-			'deepseek-chat',
+			'llama-3.3-70b',
 			KnowledgePieces
 		);
 		if (status === 'error' || !parsedObject.success) {

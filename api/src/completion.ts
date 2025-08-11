@@ -4,6 +4,7 @@ import { zodResponseFormat } from 'openai/helpers/zod.mjs';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 import { match, P } from 'ts-pattern';
 import type { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 import type { EnvBindings } from '../types';
 
@@ -79,14 +80,14 @@ export async function chatCompletion<
 	zodObject: TSchema,
 	maxTokens?: number,
 	temperature?: number,
-	responseFormat = { type: 'json_object' }
+	responseFormat = { type: 'json_schema' }
 ) {
 	const tokens = messages.reduce(
 		(sum, msg) => (typeof msg.content === 'string' ? sum + countTokens(msg.content, model) : sum),
 		0
 	);
 	if (tokens > 7_000) {
-		model = 'deepseek-chat';
+		model = 'llama-3.3-70b';
 	}
 	console.log('[model]', model);
 
@@ -124,33 +125,38 @@ export async function chatCompletion<
 				fetch(`${env.CEREBRAS_API_URL}/v1/chat/completions`, {
 					method: 'POST',
 					headers: {
-						Authorization: `Bearer ${env.CEREBRAS_API_KEY}`,
+						Authorization: `Bearer ${env.CLOUDFLARE_API_KEY}`,
 						'Content-Type': 'application/json',
 						'User-Agent': 'SimpsForLucy'
 					},
 					body: JSON.stringify({
-						model,
+						// model,
+						model: '@cf/meta/llama-4-scout-17b-16e-instruct',
 						messages,
 						max_tokens: maxTokens,
 						temperature,
-						response_format: responseFormat
+						response_format: responseFormat,
+						guided_json: zodToJsonSchema(zodObject)
 					})
 				})
 			)
 			.with(P.union('deepseek-chat', 'deepseek-reasoner'), () =>
-				fetch(`${env.DEEPSEEK_API_URL}/chat/completions`, {
+				fetch(`${env.DEEPSEEK_API_URL}/v1/chat/completions`, {
 					method: 'POST',
 					headers: {
-						Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+						Authorization: `Bearer ${env.CLOUDFLARE_API_KEY}`,
+						// Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
 						'Content-Type': 'application/json',
 						'User-Agent': 'SimpsForLucy'
 					},
 					body: JSON.stringify({
-						model,
+						// model,
+						model: '@cf/meta/llama-4-scout-17b-16e-instruct',
 						messages,
 						max_tokens: maxTokens,
 						temperature,
-						response_format: responseFormat
+						response_format: responseFormat,
+						guided_json: zodToJsonSchema(zodObject)
 					})
 				})
 			)
@@ -184,8 +190,10 @@ export async function chatCompletion<
 	}
 
 	if (!response.ok) {
+		console.log('[completion error]', response.status);
+		const resText = await response.text();
 		try {
-			const text = await response.json<{ param?: 'quota' }>();
+			const text = JSON.parse(resText);
 			console.log('[completion error response json]', JSON.stringify(text, null, 2));
 			if (text.param === 'quota') {
 				model = 'deepseek-chat';
@@ -206,16 +214,15 @@ export async function chatCompletion<
 				});
 			}
 		} catch (_) {
-			const text = await response.text();
-			console.error('[completion error response text]', text);
-			return { status: 'error' as const, errorMessage: text } as const;
+			console.error('[completion error response text]', resText);
+			return { status: 'error' as const, errorMessage: resText } as const;
 		}
 	}
 
 	const completion = await response.json<OpenAIResponse>();
 	console.log('[completion]', JSON.stringify(completion, null, 2));
 	try {
-		const rawResponse = JSON.parse(completion.choices[0].message.content || '{}');
+		const rawResponse = completion.choices[0].message.content;
 		let parsedObject = zodObject.safeParse(rawResponse) as z.SafeParseReturnType<
 			z.infer<TSchema>,
 			z.infer<TSchema>
@@ -239,6 +246,7 @@ export async function chatCompletion<
 			rawResponse: completion.choices[0].message.content
 		};
 	} catch (error) {
+		console.error('[completion error]', error);
 		return {
 			status: 'error' as const,
 			errorMessage: `Unknown error: ${JSON.stringify(error)}`,

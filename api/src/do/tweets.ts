@@ -223,7 +223,7 @@ export class Tweets extends DurableObject {
 					const { status, parsedObject, errorMessage } = await chatCompletion(
 						this.env,
 						messages,
-						'deepseek-chat',
+						'llama-3.3-70b',
 						ScheduledTweetSchema
 					);
 					if (status === 'error' || !parsedObject.success) {
@@ -243,7 +243,7 @@ export class Tweets extends DurableObject {
 					} = await chatCompletion(
 						this.env,
 						messages,
-						'deepseek-chat',
+						'llama-3.3-70b',
 						ScheduledTweetSchema,
 						undefined,
 						1.3

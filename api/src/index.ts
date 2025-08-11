@@ -15,7 +15,7 @@ import { chat } from './chat';
 import { knowledge, updateNearKnowledge } from './knowledge';
 import { memory } from './memory';
 import { getLucySession } from './session';
-import { processReplies, scheduleTweet, handleTweetOperation, tweet } from './tweet';
+import { processReplies, handleTweetOperation, tweet } from './tweet';
 
 // eslint-disable-next-line import/no-named-as-default-member
 dayjs.extend(duration);
