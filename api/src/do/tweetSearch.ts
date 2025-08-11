@@ -150,7 +150,7 @@ const Scrapes: Record<
 	lucy: {
 		type: 'search',
 		query: '@SimpsForLucy',
-		maxResults: 5,
+		maxResults: 3,
 		checkAuthor: false,
 		minFollowers: 0,
 		minListedCount: 0
@@ -160,7 +160,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'from:ricburton OR from:jillruthcarlson OR from:trentmc0 OR from:Melt_Dem OR from:tayvano_ OR from:willclemente OR from:elliotrades OR from:dylanleclair_ OR from:jackmallers OR from:planbtc OR from:pmarca OR from:PublicAI_ min_faves:12 min_retweets:5 -is:retweet'
 		),
-		maxResults: 5,
+		maxResults: 3,
 		checkAuthor: false,
 		minFollowers: 0,
 		minListedCount: 0
@@ -170,7 +170,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'"underrated crypto" OR "emerging crypto" OR "url:medium.com blockchain" OR "DeFi innovation" OR "blockchain scalability" OR "AI blockchain" OR "chain abstraction" OR "crypto adoption" OR "blockchain interoperability" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5,
+		maxResults: 3,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -192,7 +192,7 @@ const Scrapes: Record<
 			'1498590272443363328', // 'melarin_the',
 			'1561002226562531329' // 'tima_malla'
 		],
-		maxResults: 5,
+		maxResults: 3,
 		isReply: false,
 		isRetweet: false,
 		hasMedia: true
@@ -202,7 +202,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'("AI agent" OR "AI agents" OR "ai web3" OR elizaos OR eliza OR ai16z OR aixbt) -((hey OR hi OR hello OR thought OR thoughts OR "do you" OR "are you") (aixbt OR ai16z OR eliza)) -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5,
+		maxResults: 3,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -212,7 +212,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'"defi" OR "defai" OR "mpc" OR "chain agnostic" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5,
+		maxResults: 3,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
@@ -222,7 +222,7 @@ const Scrapes: Record<
 		query: fixQuery(
 			'"white house crypto" -(alpha telegram) -(follow back) -(binance coinbase) -(top growth) -(try free) -breaking -cardano -xrp -filter:replies -is:retweet min_faves:10 min_retweets:2 -giveaway -shill -pump -listing -launching -ca -ngl -fr -wen -movers -vibes -gainers -bro -explode -repricing -airdrop -analysts lang:en'
 		),
-		maxResults: 5,
+		maxResults: 3,
 		checkAuthor: true,
 		minFollowers: 100,
 		minListedCount: 5
