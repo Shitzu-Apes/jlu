@@ -824,7 +824,7 @@ Output a JSON response with:
 						}
 
 						tweet.lucyTweets = lucyResponse.tweets;
-						tweet.generateImage = lucyResponse.generate_image;
+						tweet.generateImage = Math.random() < 0.1;
 						tweet.imagePrompt = lucyResponse.image_prompt;
 						tweet.outfit = lucyResponse.outfit as unknown as Outfit;
 						tweet.hairstyle = lucyResponse.hairstyle as unknown as Hairstyle;
