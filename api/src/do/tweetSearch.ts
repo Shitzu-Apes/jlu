@@ -707,7 +707,8 @@ Output a JSON response with:
 							await Promise.all(
 								knowledgePieces.categories.map(async (category) => {
 									const list = await this.env.KV.list({
-										prefix: `knowledge:categoryJSON:${category}:`
+										prefix: `knowledge:categoryJSON:${category}:`,
+										limit: 15
 									});
 									const values = (
 										await Promise.all(
@@ -830,12 +831,7 @@ Output a JSON response with:
 						return new Response(null, { status: 204 });
 					}
 
-					if (
-						tweet.imageGenerationId == null &&
-						tweet.imagePrompt != null &&
-						tweet.outfit != null &&
-						tweet.hairstyle != null
-					) {
+					if (tweet.imageGenerationId == null) {
 						const leoRes = await fetch(`https://cloud.leonardo.ai/api/rest/v1/me`, {
 							headers: {
 								Authorization: `Bearer ${this.env.LEONARDO_API_KEY}`,
@@ -911,7 +907,7 @@ Output a JSON response with:
 						} else {
 							console.log('[generating image]');
 							const res = await generateImage(
-								`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit]['warm']} - ${HairstylePrompt[tweet.hairstyle]} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
+								`female asian character, short dark purple hair, green eyes, realistic figure - ${OutfitPrompt[tweet.outfit ?? 'corset_dress']['warm']} - ${HairstylePrompt[tweet.hairstyle ?? 'bob']} - ${tweet.imagePrompt} - highly detailed linework, soft shading, ultra-realistic anime art style with vibrant highlights and smooth gradients`,
 								this.env
 							);
 							if (!res.ok) {
